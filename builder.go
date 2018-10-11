@@ -19,7 +19,8 @@ const schemeName = "consul"
 type builder struct{}
 
 func (b *builder) Build(url resolver.Target, cc resolver.ClientConn, opts resolver.BuildOption) (resolver.Resolver, error) {
-	tgt, err := parseURL(url.Authority, url.Endpoint)
+	dsn := strings.Join([]string{schemeName + ":/", url.Authority, url.Endpoint}, "/")
+	tgt, err := parseURL(dsn)
 	if err != nil {
 		return nil, errors.Wrap(err, "Wrong consul URL")
 	}
@@ -45,44 +46,54 @@ func (b *builder) Scheme() string {
 	return schemeName
 }
 
-func parseURL(athority, u string) (target, error) {
+func parseURL(u string) (target, error) {
 	const (
-		waitTimeParamName   = "wait"
-		onlyTagsParamName   = "only_tags"
-		onlyHealthParamName = "only_health"
-		listSeparator       = ","
+		waitTimeParamName = "wait"
+		tagParamName      = "tag"
+		healthyParamName  = "healthy"
+		listSeparator     = ","
 	)
-	rawURL, err := url.Parse(strings.Join([]string{athority, u}, "/"))
+	rawURL, err := url.Parse(u)
 	if err != nil {
 		return target{}, errors.Wrap(err, "Malformed URL")
 	}
-	var creds api.HttpBasicAuth
+	if rawURL.Scheme != schemeName ||
+		len(rawURL.Host) == 0 || len(strings.TrimLeft(rawURL.Path, "/")) == 0 {
+		return target{},
+			errors.Errorf("Malformed URL('%s'). Must be in the next format: 'consul://[user:passwd]@host/service?param=value'", u)
+	}
+
+	var creds *api.HttpBasicAuth
 	passwd, ok := rawURL.User.Password()
 	if ok {
 		creds.Password = passwd
 		creds.Username = rawURL.User.Username()
 	}
 
-	waitTime, err := time.ParseDuration(rawURL.Query().Get(waitTimeParamName))
-	if err != nil {
-		return target{}, errors.Wrapf(err, "Malformed URL parameter: %s", waitTimeParamName)
+	var waitTime time.Duration
+	if wt := rawURL.Query().Get(waitTimeParamName); len(wt) > 0 {
+		waitTime, err = time.ParseDuration(wt)
+		if err != nil {
+			return target{}, errors.Wrapf(err, "Malformed URL parameter: '%s'", waitTimeParamName)
+		}
 	}
 
 	var onlyHealth bool
-	if oh := rawURL.Query().Get(onlyHealthParamName); len(oh) > 0 {
+	if oh := rawURL.Query().Get(healthyParamName); len(oh) > 0 {
 		onlyHealth, err = strconv.ParseBool(oh)
 		if err != nil {
-			return target{}, errors.Wrapf(err, "Malformed URL parameter: %s", onlyHealthParamName)
+			return target{}, errors.Wrapf(err, "Malformed URL parameter: '%s'", healthyParamName)
 		}
 	}
+
 	return target{
-		service:    rawURL.Opaque,
-		onlyHealth: onlyHealth,
-		onlyTags:   strings.Split(rawURL.Query().Get(onlyTagsParamName), listSeparator),
+		service: strings.TrimLeft(rawURL.Path, "/"),
+		healthy: onlyHealth,
+		tag:     rawURL.Query().Get(tagParamName),
 		Config: api.Config{
 			Address:  rawURL.Host,
 			WaitTime: waitTime,
-			HttpAuth: &creds,
+			HttpAuth: creds,
 		},
 	}, nil
 }
