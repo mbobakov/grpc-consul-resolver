@@ -1,9 +1,9 @@
 package consul
 
 import (
+	"context"
 	"fmt"
 	"sort"
-	"time"
 
 	"github.com/hashicorp/consul/api"
 	"google.golang.org/grpc/grpclog"
@@ -18,24 +18,7 @@ func init() {
 // consulResolver watch for enpoints changes and push to the GRPC only diffs
 // consulResolver implements resolver.Resolver from the GRPC package
 type resolvr struct {
-	target               target
-	client               *api.Client
-	done                 chan struct{}
-	cc                   resolver.ClientConn
-	disableServiceConfig bool
-}
-
-type target struct {
-	tag     string
-	healthy bool
-	service string
-	api.Config
-	// TODO(mbobakov): custom parameters for the http-transport
-	// TODO(mbobakov): custom parameters for the TLS subsystem
-}
-
-func (t *target) String() string {
-	return fmt.Sprintf("service=%s healthy=%t tag=%s", t.service, t.healthy, t.tag)
+	cancelFunc context.CancelFunc
 }
 
 // ResolveNow will be skipped due unnecessary in this case
@@ -43,56 +26,74 @@ func (r *resolvr) ResolveNow(resolver.ResolveNowOption) {}
 
 // Close closes the resolver.
 func (r *resolvr) Close() {
-	close(r.done)
+	r.cancelFunc()
 }
 
-func (r *resolvr) watch() {
-	t := r.target
-	connsCh := make(chan []resolver.Address)
+type servicer interface {
+	Service(string, string, bool, *api.QueryOptions) ([]*api.ServiceEntry, *api.QueryMeta, error)
+}
+
+func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- []string) {
+	res := make(chan []string)
 	go func() {
 		var lastIndex uint64
 		for {
-			ts := time.Now()
-			ss, meta, err := r.client.Health().Service(
-				t.service,
-				t.tag,
-				t.healthy,
+			ss, meta, err := s.Service(
+				tgt.Service,
+				tgt.Tag,
+				tgt.Healthy,
 				&api.QueryOptions{
 					WaitIndex: lastIndex,
+					Near:      tgt.Near,
 				},
 			)
 			if err != nil {
-				grpclog.Errorf("[Consul resolver] Couldn't fetch endpoints. target={%s}", t.String())
+				grpclog.Errorf("[Consul resolver] Couldn't fetch endpoints. target={%s}", tgt)
 				continue
 			}
 			grpclog.Infof("[Consul resolver] %d endpoints fetched in(+wait) %s for target={%s}",
 				len(ss),
-				time.Since(ts),
-				t.String(),
+				meta.RequestTime,
+				tgt,
 			)
-			lastIndex = meta.LastIndex
-			if len(ss) == 0 {
-				continue
-			}
 
-			connsSet := make(map[string]struct{}, len(ss))
+			lastIndex = meta.LastIndex
+			ee := make([]string, 0, len(ss))
 			for _, s := range ss {
-				connsSet[fmt.Sprintf("%s:%d", s.Service.Address, s.Service.Port)] = struct{}{}
+				ee = append(ee, fmt.Sprintf("%s:%d", s.Service.Address, s.Service.Port))
+			}
+			if tgt.Limit != 0 && len(ee) > tgt.Limit {
+				ee = ee[:tgt.Limit-1]
+			}
+			res <- ee
+		}
+	}()
+
+	for {
+		select {
+		case ee := <-res:
+			out <- ee
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func populateEndpoints(ctx context.Context, clientConn resolver.ClientConn, input <-chan []string) {
+	for {
+		select {
+		case cc := <-input:
+			connsSet := make(map[string]struct{}, len(cc))
+			for _, c := range cc {
+				connsSet[c] = struct{}{}
 			}
 			conns := make([]resolver.Address, 0, len(connsSet))
 			for c := range connsSet {
 				conns = append(conns, resolver.Address{Addr: c})
 			}
-
 			sort.Sort(byAddressString(conns)) // Don't replace the same address list in the balancer
-			connsCh <- conns
-		}
-	}()
-	for {
-		select {
-		case cc := <-connsCh:
-			r.cc.NewAddress(cc)
-		case <-r.done:
+			clientConn.NewAddress(conns)
+		case <-ctx.Done():
 			grpclog.Info("[Consul resolver] Watch has been finiched")
 			return
 		}
