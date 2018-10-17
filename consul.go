@@ -45,8 +45,10 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 				&api.QueryOptions{
 					WaitIndex: lastIndex,
 					Near:      tgt.Near,
+					WaitTime:  tgt.Wait,
 				},
 			)
+			lastIndex = meta.LastIndex
 			if err != nil {
 				grpclog.Errorf("[Consul resolver] Couldn't fetch endpoints. target={%s}", tgt)
 				continue
@@ -57,13 +59,12 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 				tgt,
 			)
 
-			lastIndex = meta.LastIndex
 			ee := make([]string, 0, len(ss))
 			for _, s := range ss {
 				ee = append(ee, fmt.Sprintf("%s:%d", s.Service.Address, s.Service.Port))
 			}
 			if tgt.Limit != 0 && len(ee) > tgt.Limit {
-				ee = ee[:tgt.Limit-1]
+				ee = ee[:tgt.Limit]
 			}
 			res <- ee
 		}
@@ -94,7 +95,7 @@ func populateEndpoints(ctx context.Context, clientConn resolver.ClientConn, inpu
 			sort.Sort(byAddressString(conns)) // Don't replace the same address list in the balancer
 			clientConn.NewAddress(conns)
 		case <-ctx.Done():
-			grpclog.Info("[Consul resolver] Watch has been finiched")
+			grpclog.Info("[Consul resolver] Watch has been finished")
 			return
 		}
 	}
