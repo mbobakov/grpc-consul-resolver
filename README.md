@@ -19,16 +19,14 @@ package main
 
 import (
 	"time"
-
-	_ "github.com/mbobakov/grpc-consul-resolver"
-	"github.com/sirupsen/logrus"
+	
+	_ "github.com/mbobakov/grpc-consul-resolver" // It's important
+	
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/grpclog"
 )
 
 func main() {
-	conn, err := grpc.Dial(
-        "consul://127.0.0.1:8500/whoami?wait=14s&tag=manual", 
+	conn, err := grpc.Dial( "consul://127.0.0.1:8500/whoami?wait=14s&tag=manual",  // See connection string section !
         grpc.WithInsecure(), 
         grpc.WithBalancerName("round_robin"),
     )
