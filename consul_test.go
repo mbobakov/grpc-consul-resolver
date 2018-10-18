@@ -18,24 +18,24 @@ func TestPopulateEndpoints(t *testing.T) {
 		input [][]string
 		want  []resolver.Address
 	}{
-		{"one", [][]string{[]string{"127.0.0.1:50051"}}, []resolver.Address{resolver.Address{Addr: "127.0.0.1:50051"}}},
+		{"one", [][]string{{"127.0.0.1:50051"}}, []resolver.Address{{Addr: "127.0.0.1:50051"}}},
 		{"sorted",
 			[][]string{
-				[]string{"227.0.0.1:50051", "127.0.0.1:50051"},
+				{"227.0.0.1:50051", "127.0.0.1:50051"},
 			},
 			[]resolver.Address{
-				resolver.Address{Addr: "127.0.0.1:50051"},
-				resolver.Address{Addr: "227.0.0.1:50051"},
+				{Addr: "127.0.0.1:50051"},
+				{Addr: "227.0.0.1:50051"},
 			},
 		},
 		{"multy",
 			[][]string{
-				[]string{"127.0.0.1:50051"},
-				[]string{"127.0.0.1:50052"},
-				[]string{"127.0.0.1:50053"},
+				{"127.0.0.1:50051"},
+				{"127.0.0.1:50052"},
+				{"127.0.0.1:50053"},
 			},
 			[]resolver.Address{
-				resolver.Address{Addr: "127.0.0.1:50053"},
+				{Addr: "127.0.0.1:50053"},
 			},
 		},
 	}

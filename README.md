@@ -1,4 +1,16 @@
-### Connection string
+# GRPC consul resolver
+
+Feature rich and easy-to-use resolver which return endpoints for service from the [Hashicorp Consul](https://www.consul.io) and watch for the changes.
+
+This library is *production ready* and will always *save backward-compatibility*
+
+## Quick Start
+
+For using resolving endpoints from your [Hashicorp Consul](https://www.consul.io) just import this library with `import _ /github.com/mbobakov/grpc-consul-resolver` and pass valid connection string to the `grpc.Dial`.
+
+For full example see [this section](#example)
+
+## Connection string
 `consul://[user:password@]127.0.0.127:8555/my-service?[healthy=]&[wait=]&[near=]&[insecure=]&[limit=]&[tag=]`
 
 *Parameters:*
@@ -13,7 +25,7 @@
 | limit    	| int                      	| Limit number of endpoints for the service. Default: no limit                                                          	|
 | timeout  	| as in time.ParseDuration 	| Http-client timeout. Default: 60s                                                                                     	|
 
-### Example
+## Example
 ```go
 package main
 
@@ -37,3 +49,11 @@ func main() {
     ...
 }
 ```
+<<<<<<< HEAD
+=======
+
+## License
+
+MIT-LICENSE. See [LICENSE](http://olivere.mit-license.org/)
+or the LICENSE file provided in the repository for details.
+>>>>>>> Readme
