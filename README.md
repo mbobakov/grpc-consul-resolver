@@ -49,11 +49,8 @@ func main() {
     ...
 }
 ```
-<<<<<<< HEAD
-=======
 
 ## License
 
 MIT-LICENSE. See [LICENSE](http://olivere.mit-license.org/)
 or the LICENSE file provided in the repository for details.
->>>>>>> Readme
