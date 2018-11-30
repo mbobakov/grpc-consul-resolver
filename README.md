@@ -31,6 +31,7 @@ package main
 
 import (
 	"time"
+	"log"
 	
 	_ "github.com/mbobakov/grpc-consul-resolver" // It's important
 	
@@ -38,13 +39,14 @@ import (
 )
 
 func main() {
-	conn, err := grpc.Dial( "consul://127.0.0.1:8500/whoami?wait=14s&tag=manual",  // See connection string section !
+    conn, err := grpc.Dial(
+        "consul://127.0.0.1:8500/whoami?wait=14s&tag=manual",
         grpc.WithInsecure(), 
         grpc.WithBalancerName("round_robin"),
     )
-	if err != nil {
-		t.Fatal(err)
-	}
+    if err != nil {
+        log.Fatal(err)
+    }
     defer conn.Close()
     ...
 }
