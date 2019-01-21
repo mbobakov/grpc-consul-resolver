@@ -24,6 +24,7 @@ type target struct {
 	Limit       int           `form:"limit"`
 	Healthy     bool          `form:"healthy"`
 	TLSInsecure bool          `form:"insecure"`
+	Token       string        `form:"token"`
 	// TODO(mbobakov): custom parameters for the http-transport
 	// TODO(mbobakov): custom parameters for the TLS subsystem
 }
@@ -87,5 +88,6 @@ func (t *target) consulConfig() *api.Config {
 		TLSConfig: api.TLSConfig{
 			InsecureSkipVerify: t.TLSInsecure,
 		},
+		Token: t.Token,
 	}
 }
