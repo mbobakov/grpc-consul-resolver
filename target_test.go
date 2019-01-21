@@ -23,7 +23,7 @@ func Test_parseURL(t *testing.T) {
 			},
 			false,
 		},
-		{"all-args", "consul://user:password@127.0.0.127:8555/my-service?wait=14s&near=host&insecure=true&limit=1&tag=production",
+		{"all-args", "consul://user:password@127.0.0.127:8555/my-service?wait=14s&near=host&insecure=true&limit=1&tag=production&token=test_token",
 			target{
 				Addr:        "127.0.0.127:8555",
 				User:        "user",
@@ -34,6 +34,7 @@ func Test_parseURL(t *testing.T) {
 				TLSInsecure: true,
 				Limit:       1,
 				Tag:         "production",
+				Token:       "test_token",
 			},
 			false,
 		},
