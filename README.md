@@ -11,7 +11,7 @@ For using resolving endpoints from your [Hashicorp Consul](https://www.consul.io
 For full example see [this section](#example)
 
 ## Connection string
-`consul://[user:password@]127.0.0.127:8555/my-service?[healthy=]&[wait=]&[near=]&[insecure=]&[limit=]&[tag=]`
+`consul://[user:password@]127.0.0.127:8555/my-service?[healthy=]&[wait=]&[near=]&[insecure=]&[limit=]&[tag=]&[token=]`
 
 *Parameters:*
 
@@ -24,6 +24,7 @@ For full example see [this section](#example)
 | near     	| string                   	| Sort endpoints by response duration. Can be efficient combine with `limit` parameter default: "_agent"                	|
 | limit    	| int                      	| Limit number of endpoints for the service. Default: no limit                                                          	|
 | timeout  	| as in time.ParseDuration 	| Http-client timeout. Default: 60s                                                                                     	|
+| token  	| string	                | Consul token                                                                                                              |
 
 ## Example
 ```go
