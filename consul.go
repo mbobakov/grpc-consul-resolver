@@ -49,14 +49,14 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 				},
 			)
 			if err != nil {
-				grpclog.Errorf("[Consul resolver] Couldn't fetch endpoints. target={%s}", tgt)
+				grpclog.Errorf("[Consul resolver] Couldn't fetch endpoints. target={%s}", tgt.String())
 				continue
 			}
 			lastIndex = meta.LastIndex
 			grpclog.Infof("[Consul resolver] %d endpoints fetched in(+wait) %s for target={%s}",
 				len(ss),
 				meta.RequestTime,
-				tgt,
+				tgt.String(),
 			)
 
 			ee := make([]string, 0, len(ss))
