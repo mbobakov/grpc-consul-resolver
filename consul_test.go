@@ -5,9 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/hashicorp/consul/api"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/resolver"
 )
@@ -74,7 +73,7 @@ func TestWatchConsulService(t *testing.T) {
 		want             []string
 	}{
 		{"simple", target{Service: "svc", Wait: time.Second}, []string{"127.0.0.1"}, 100, 3, false, []string{"127.0.0.1:102"}},
-		{"error", target{}, []string{"127.0.0.1"}, 100, 3, true, nil},
+		{"error", target{}, []string{"127.0.0.1"}, 100, 2, true, nil},
 		{"limit", target{Limit: 1}, []string{"127.0.0.1", "127.0.0.2", "127.0.0.3"}, 100, 1, false, []string{"127.0.0.1:100"}},
 		{"limitOver", target{Limit: 10}, []string{"127.0.0.1"}, 100, 1, false, []string{"127.0.0.1:100"}},
 	}
@@ -117,7 +116,7 @@ func TestWatchConsulService(t *testing.T) {
 			}
 
 			go watchConsulService(ctx, fconsul, tt.tgt, out)
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(15 * time.Millisecond)
 
 			require.True(t, fconsul.ServiceCalledN(int(tt.times)))
 			require.Equal(t, tt.want, got)

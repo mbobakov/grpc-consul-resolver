@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/hashicorp/consul/api"
+	"github.com/jpillora/backoff"
 	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/resolver"
 )
@@ -35,6 +37,12 @@ type servicer interface {
 
 func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- []string) {
 	res := make(chan []string)
+	bck := &backoff.Backoff{
+		Factor: 2,
+		Jitter: true,
+		Min:    10 * time.Millisecond,
+		Max:    tgt.MaxBackoff,
+	}
 	go func() {
 		var lastIndex uint64
 		for {
@@ -50,8 +58,10 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 			)
 			if err != nil {
 				grpclog.Errorf("[Consul resolver] Couldn't fetch endpoints. target={%s}", tgt.String())
+				time.Sleep(bck.Duration())
 				continue
 			}
+			bck.Reset()
 			lastIndex = meta.LastIndex
 			grpclog.Infof("[Consul resolver] %d endpoints fetched in(+wait) %s for target={%s}",
 				len(ss),
@@ -61,7 +71,7 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 
 			ee := make([]string, 0, len(ss))
 			for _, s := range ss {
-				ee = append(ee, fmt.Sprintf("%s:%d", s.Node.Address, s.Service.Port))
+				ee = append(ee, fmt.Sprintf("%s:%d", s.Service.Address, s.Service.Port))
 			}
 			if tgt.Limit != 0 && len(ee) > tgt.Limit {
 				ee = ee[:tgt.Limit]

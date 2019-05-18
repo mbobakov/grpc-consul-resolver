@@ -19,6 +19,7 @@ type target struct {
 	Service     string        `form:"-"`
 	Wait        time.Duration `form:"wait"`
 	Timeout     time.Duration `form:"timeout"`
+	MaxBackoff  time.Duration `form:"max-backoff"`
 	Tag         string        `form:"tag"`
 	Near        string        `form:"near"`
 	Limit       int           `form:"limit"`
@@ -64,6 +65,9 @@ func parseURL(u string) (target, error) {
 	}
 	if len(tgt.Near) == 0 {
 		tgt.Near = "_agent"
+	}
+	if tgt.MaxBackoff == 0 {
+		tgt.MaxBackoff = time.Second
 	}
 	return tgt, nil
 }
