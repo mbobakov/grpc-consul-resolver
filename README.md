@@ -14,17 +14,17 @@ For full example see [this section](#example)
 `consul://[user:password@]127.0.0.127:8555/my-service?[healthy=]&[wait=]&[near=]&[insecure=]&[limit=]&[tag=]&[token=]`
 
 *Parameters:*
-
-| Name     	| Format                   	| Description                                                                                                           	|
-|----------	|--------------------------	|-----------------------------------------------------------------------------------------------------------------------	|
-| tag      	| string                   	| Select endpoints only with this tag                                                                                   	|
-| healthy  	| true/false               	| Return only endpoints which pass all health-checks. Default: false                                                    	|
-| wait     	| as in time.ParseDuration 	| Wait time for watch changes. Due this time period endpoints will be force refreshed. Default: inherits agent property 	|
-| insecure 	| true/false               	| Allow insecure communication with Consul. Default: true                                                               	|
-| near     	| string                   	| Sort endpoints by response duration. Can be efficient combine with `limit` parameter default: "_agent"                	|
-| limit    	| int                      	| Limit number of endpoints for the service. Default: no limit                                                          	|
-| timeout  	| as in time.ParseDuration 	| Http-client timeout. Default: 60s                                                                                     	|
-| token  	| string	                | Consul token                                                                                                              |
+| Name        | Format                   | Description                                                                                                                   |
+|-------------|--------------------------|-------------------------------------------------------------------------------------------------------------------------------|
+| tag         | string                   | Select endpoints only with this tag                                                                                           |
+| healthy     | true/false               | Return only endpoints which pass all health-checks. Default: false                                                            |
+| wait        | as in time.ParseDuration | Wait time for watch changes. Due this time period endpoints will be force refreshed. Default: inherits agent property         |
+| insecure    | true/false               | Allow insecure communication with Consul. Default: true                                                                       |
+| near        | string                   | Sort endpoints by response duration. Can be efficient combine with `limit` parameter default: "_agent"                        |
+| limit       | int                      | Limit number of endpoints for the service. Default: no limit                                                                  |
+| timeout     | as in time.ParseDuration | Http-client timeout. Default: 60s                                                                                             |
+| max-backoff | as in time.ParseDuration | Max backoff time for reconnect to consul. Reconnects will from 10ms to _max-backoff_ exponentialy with factor 2.  Default: 1s |
+| token       | string                   | Consul token                                                                                                                  |
 
 ## Example
 ```go
@@ -33,16 +33,16 @@ package main
 import (
 	"time"
 	"log"
-	
+
 	_ "github.com/mbobakov/grpc-consul-resolver" // It's important
-	
+
 	"google.golang.org/grpc"
 )
 
 func main() {
     conn, err := grpc.Dial(
         "consul://127.0.0.1:8500/whoami?wait=14s&tag=manual",
-        grpc.WithInsecure(), 
+        grpc.WithInsecure(),
         grpc.WithBalancerName("round_robin"),
     )
     if err != nil {

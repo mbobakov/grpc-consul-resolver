@@ -17,13 +17,14 @@ func Test_parseURL(t *testing.T) {
 	}{
 		{"simple", "consul://127.0.0.127:8555/my-service",
 			target{
-				Addr:    "127.0.0.127:8555",
-				Service: "my-service",
-				Near:    "_agent",
+				Addr:       "127.0.0.127:8555",
+				Service:    "my-service",
+				Near:       "_agent",
+				MaxBackoff: time.Second,
 			},
 			false,
 		},
-		{"all-args", "consul://user:password@127.0.0.127:8555/my-service?wait=14s&near=host&insecure=true&limit=1&tag=production&token=test_token",
+		{"all-args", "consul://user:password@127.0.0.127:8555/my-service?wait=14s&near=host&insecure=true&limit=1&tag=production&token=test_token&max-backoff=2s",
 			target{
 				Addr:        "127.0.0.127:8555",
 				User:        "user",
@@ -35,6 +36,7 @@ func Test_parseURL(t *testing.T) {
 				Limit:       1,
 				Tag:         "production",
 				Token:       "test_token",
+				MaxBackoff:  2 * time.Second,
 			},
 			false,
 		},
