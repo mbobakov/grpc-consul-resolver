@@ -14,6 +14,7 @@ For full example see [this section](#example)
 `consul://[user:password@]127.0.0.127:8555/my-service?[healthy=]&[wait=]&[near=]&[insecure=]&[limit=]&[tag=]&[token=]`
 
 *Parameters:*
+
 | Name        | Format                   | Description                                                                                                                   |
 |-------------|--------------------------|-------------------------------------------------------------------------------------------------------------------------------|
 | tag         | string                   | Select endpoints only with this tag                                                                                           |
