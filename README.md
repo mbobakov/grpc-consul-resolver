@@ -24,7 +24,7 @@ For full example see [this section](#example)
 | near        | string                   | Sort endpoints by response duration. Can be efficient combine with `limit` parameter default: "_agent"                        |
 | limit       | int                      | Limit number of endpoints for the service. Default: no limit                                                                  |
 | timeout     | as in time.ParseDuration | Http-client timeout. Default: 60s                                                                                             |
-| max-backoff | as in time.ParseDuration | Max backoff time for reconnect to consul. Reconnects will from 10ms to _max-backoff_ exponentialy with factor 2.  Default: 1s |
+| max-backoff | as in time.ParseDuration | Max backoff time for reconnect to consul. Reconnects will start from 10ms to _max-backoff_ exponentialy with factor 2.  Default: 1s |
 | token       | string                   | Consul token                                                                                                                  |
 
 ## Example
