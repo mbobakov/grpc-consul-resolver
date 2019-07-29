@@ -51,9 +51,12 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 				tgt.Tag,
 				tgt.Healthy,
 				&api.QueryOptions{
-					WaitIndex: lastIndex,
-					Near:      tgt.Near,
-					WaitTime:  tgt.Wait,
+					WaitIndex:         lastIndex,
+					Near:              tgt.Near,
+					WaitTime:          tgt.Wait,
+					Datacenter:        tgt.Dc,
+					AllowStale:        tgt.AllowStale,
+					RequireConsistent: tgt.RequireConsistent,
 				},
 			)
 			if err != nil {

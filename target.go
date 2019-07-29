@@ -13,19 +13,22 @@ import (
 )
 
 type target struct {
-	Addr        string        `form:"-"`
-	User        string        `form:"-"`
-	Password    string        `form:"-"`
-	Service     string        `form:"-"`
-	Wait        time.Duration `form:"wait"`
-	Timeout     time.Duration `form:"timeout"`
-	MaxBackoff  time.Duration `form:"max-backoff"`
-	Tag         string        `form:"tag"`
-	Near        string        `form:"near"`
-	Limit       int           `form:"limit"`
-	Healthy     bool          `form:"healthy"`
-	TLSInsecure bool          `form:"insecure"`
-	Token       string        `form:"token"`
+	Addr              string        `form:"-"`
+	User              string        `form:"-"`
+	Password          string        `form:"-"`
+	Service           string        `form:"-"`
+	Wait              time.Duration `form:"wait"`
+	Timeout           time.Duration `form:"timeout"`
+	MaxBackoff        time.Duration `form:"max-backoff"`
+	Tag               string        `form:"tag"`
+	Near              string        `form:"near"`
+	Limit             int           `form:"limit"`
+	Healthy           bool          `form:"healthy"`
+	TLSInsecure       bool          `form:"insecure"`
+	Token             string        `form:"token"`
+	Dc                string        `form:"dc"`
+	AllowStale        bool          `form:"allow-stale"`
+	RequireConsistent bool          `form:"require-consistent"`
 	// TODO(mbobakov): custom parameters for the http-transport
 	// TODO(mbobakov): custom parameters for the TLS subsystem
 }
