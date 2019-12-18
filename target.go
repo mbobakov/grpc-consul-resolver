@@ -75,11 +75,12 @@ func parseURL(u string) (target, error) {
 	return tgt, nil
 }
 
-// consulConfig based on the parsed target
-// It use custom http-client
+// consulConfig returns config based on the parsed target.
+// It uses custom http-client.
 func (t *target) consulConfig() *api.Config {
 	var creds *api.HttpBasicAuth
 	if len(t.User) > 0 && len(t.Password) > 0 {
+		creds = new(api.HttpBasicAuth)
 		creds.Password = t.Password
 		creds.Username = t.User
 	}
