@@ -17,8 +17,8 @@ func init() {
 	resolver.Register(&builder{})
 }
 
-// consulResolver watch for enpoints changes and push to the GRPC only diffs
-// consulResolver implements resolver.Resolver from the GRPC package
+// resolvr implements resolver.Resolver from the gRPC package.
+// It watches for endpoints changes and pushes them to the underlying gRPC connection.
 type resolvr struct {
 	cancelFunc context.CancelFunc
 }
