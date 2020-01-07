@@ -1,7 +1,7 @@
 version: "2.3"
 services:
   consul:
-    image: consul:1.2.3
+    image: consul:1.6.2
     ports:
       - "127.0.0.1:8500:8500"
     command: agent -ui -client 0.0.0.0 -dev

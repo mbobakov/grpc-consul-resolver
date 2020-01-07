@@ -15,7 +15,7 @@ import (
 func TestCLient(t *testing.T) {
 	logger := logrus.New()
 	grpclog.SetLoggerV2(&grpcLog{logger})
-	conn, err := grpc.Dial("consul://127.0.0.1:8500/whoami?wait=14s&tag=manual", grpc.WithInsecure(), grpc.WithBalancerName("round_robin"))
+	conn, err := grpc.Dial("consul://127.0.0.1:8500/whoami?wait=14s&tag=public", grpc.WithInsecure(), grpc.WithBalancerName("round_robin"))
 	if err != nil {
 		t.Fatal(err)
 	}
