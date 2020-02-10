@@ -24,7 +24,7 @@ type resolvr struct {
 }
 
 // ResolveNow will be skipped due unnecessary in this case
-func (r *resolvr) ResolveNow(resolver.ResolveNowOption) {}
+func (r *resolvr) ResolveNow(resolver.ResolveNowOptions) {}
 
 // Close closes the resolver.
 func (r *resolvr) Close() {
