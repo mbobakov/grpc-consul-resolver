@@ -16,7 +16,7 @@ const schemeName = "consul"
 // builder implements resolver.Builder and use for constructing all consul resolvers
 type builder struct{}
 
-func (b *builder) Build(url resolver.Target, cc resolver.ClientConn, opts resolver.BuildOption) (resolver.Resolver, error) {
+func (b *builder) Build(url resolver.Target, cc resolver.ClientConn, opts resolver.BuildOptions) (resolver.Resolver, error) {
 	dsn := strings.Join([]string{schemeName + ":/", url.Authority, url.Endpoint}, "/")
 	tgt, err := parseURL(dsn)
 	if err != nil {
