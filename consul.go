@@ -76,8 +76,13 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 
 			ee := make([]string, 0, len(ss))
 			for _, s := range ss {
-				ee = append(ee, fmt.Sprintf("%s:%d", s.Service.Address, s.Service.Port))
+				address := s.Service.Address
+				if s.Service.Address == "" {
+					address = s.Node.Address
+				}
+				ee = append(ee, fmt.Sprintf("%s:%d", address, s.Service.Port))
 			}
+
 			if tgt.Limit != 0 && len(ee) > tgt.Limit {
 				ee = ee[:tgt.Limit]
 			}
