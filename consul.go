@@ -39,6 +39,7 @@ type servicer interface {
 
 func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- []string) {
 	res := make(chan []string)
+	quit := make(chan struct{})
 	bck := &backoff.Backoff{
 		Factor: 2,
 		Jitter: true,
@@ -86,7 +87,12 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 			if tgt.Limit != 0 && len(ee) > tgt.Limit {
 				ee = ee[:tgt.Limit]
 			}
-			res <- ee
+			select {
+			case res <- ee:
+				continue
+			case <-quit:
+				return
+			}
 		}
 	}()
 
@@ -95,6 +101,8 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 		case ee := <-res:
 			out <- ee
 		case <-ctx.Done():
+			close(quit)
+			close(res)
 			return
 		}
 	}
