@@ -97,13 +97,20 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 	}()
 
 	for {
+		// If in the below select both channels have values that can be read,
+		// Go picks one pseudo-randomly.
+		// But when the context is canceled we want to act upon it immediately.
+		if ctx.Err() != nil {
+			// Close quit so the goroutine returns and doesn't leak.
+			// Do NOT close res because that can lead to panics in the goroutine.
+			// res will be garbage collected at some point.
+			close(quit)
+			return
+		}
 		select {
 		case ee := <-res:
 			out <- ee
 		case <-ctx.Done():
-			// Close quit so the goroutine returns and doesn't leak.
-			// Do NOT close res because that can lead to panics in the goroutine.
-			// res will be garbage collected at some point.
 			close(quit)
 			return
 		}
