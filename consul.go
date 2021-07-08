@@ -120,16 +120,16 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 	}
 }
 
-func populateEndpoints(ctx context.Context, clientConn resolver.ClientConn, input <-chan []string) {
+func populateEndpoints(
+	ctx context.Context,
+	clientConn resolver.ClientConn,
+	input <-chan []string,
+) {
 	for {
 		select {
 		case cc := <-input:
-			connsSet := make(map[string]struct{}, len(cc))
+			conns := make([]resolver.Address, 0, len(cc))
 			for _, c := range cc {
-				connsSet[c] = struct{}{}
-			}
-			conns := make([]resolver.Address, 0, len(connsSet))
-			for c := range connsSet {
 				conns = append(conns, resolver.Address{Addr: c})
 			}
 			sort.Sort(byAddressString(conns)) // Don't replace the same address list in the balancer

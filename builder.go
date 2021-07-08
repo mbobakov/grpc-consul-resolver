@@ -22,6 +22,7 @@ func (b *builder) Build(url resolver.Target, cc resolver.ClientConn, opts resolv
 	if err != nil {
 		return nil, errors.Wrap(err, "Wrong consul URL")
 	}
+
 	cli, err := api.NewClient(tgt.consulConfig())
 	if err != nil {
 		return nil, errors.Wrap(err, "Couldn't connect to the Consul API")
