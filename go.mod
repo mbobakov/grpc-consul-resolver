@@ -1,6 +1,6 @@
 module github.com/mbobakov/grpc-consul-resolver
 
-go 1.13
+go 1.16
 
 require (
 	github.com/armon/go-metrics v0.3.2 // indirect
