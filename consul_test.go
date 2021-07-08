@@ -21,7 +21,7 @@ func TestPopulateEndpoints(t *testing.T) {
 		{"one",
 			[][]string{{"127.0.0.1:50051"}},
 			[][]resolver.Address{
-				[]resolver.Address{
+				{
 					{Addr: "127.0.0.1:50051"},
 				},
 			},
@@ -31,7 +31,7 @@ func TestPopulateEndpoints(t *testing.T) {
 				{"227.0.0.1:50051", "127.0.0.1:50051"},
 			},
 			[][]resolver.Address{
-				[]resolver.Address{
+				{
 					{Addr: "127.0.0.1:50051"},
 					{Addr: "227.0.0.1:50051"},
 				},
@@ -41,10 +41,8 @@ func TestPopulateEndpoints(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-			var (
-				in = make(chan []string, len(tt.input))
-			)
+
+			in := make(chan []string, len(tt.input))
 
 			fcc := mocks.NewMockClientConn(ctrl)
 			for _, aa := range tt.wantCalls {
@@ -52,11 +50,13 @@ func TestPopulateEndpoints(t *testing.T) {
 			}
 
 			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			t.Cleanup(cancel)
+
 			go populateEndpoints(ctx, fcc, in)
 			for _, i := range tt.input {
 				in <- i
 			}
+
 			time.Sleep(time.Millisecond)
 		})
 	}
@@ -70,23 +70,24 @@ func TestWatchConsulService(t *testing.T) {
 		errorFromService error
 		want             []string
 	}{
-		{"simple", target{Service: "svc", Wait: time.Second},
-			[]*api.ServiceEntry{
-				&api.ServiceEntry{
+		{
+			name: "simple",
+			tgt:  target{Service: "svc", Wait: time.Second},
+			services: []*api.ServiceEntry{
+				{
 					Service: &api.AgentService{Address: "127.0.0.1", Port: 1024},
 				},
 			},
-			nil,
-			[]string{"127.0.0.1:1024"},
+			want: []string{"127.0.0.1:1024"},
 		},
 		// TODO: Add more tests-cases
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			t.Cleanup(cancel)
+
 			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			var (
 				got []string
@@ -101,6 +102,7 @@ func TestWatchConsulService(t *testing.T) {
 					}
 				}
 			}()
+
 			fconsul := mocks.NewMockservicer(ctrl)
 			fconsul.EXPECT().Service(tt.tgt.Service, tt.tgt.Tag, tt.tgt.Healthy, &api.QueryOptions{
 				WaitIndex:         0,

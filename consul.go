@@ -39,7 +39,6 @@ type servicer interface {
 
 func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- []string) {
 	res := make(chan []string)
-	quit := make(chan struct{})
 	bck := &backoff.Backoff{
 		Factor: 2,
 		Jitter: true,
@@ -67,8 +66,22 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 				time.Sleep(bck.Duration())
 				continue
 			}
+
 			bck.Reset()
-			lastIndex = meta.LastIndex
+
+			if meta.LastIndex == lastIndex {
+				grpclog.Info("[Consul resolver] no change")
+				continue
+			}
+
+			if meta.LastIndex < lastIndex {
+				// according to https://www.consul.io/api-docs/features/blocking
+				// we should reset the index if it goes backward
+				lastIndex = 0
+			} else {
+				lastIndex = meta.LastIndex
+			}
+
 			grpclog.Infof("[Consul resolver] %d endpoints fetched in(+wait) %s for target={%s}",
 				len(ss),
 				meta.RequestTime,
@@ -87,10 +100,11 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 			if tgt.Limit != 0 && len(ee) > tgt.Limit {
 				ee = ee[:tgt.Limit]
 			}
+
 			select {
 			case res <- ee:
 				continue
-			case <-quit:
+			case <-ctx.Done():
 				return
 			}
 		}
@@ -101,10 +115,6 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 		case ee := <-res:
 			out <- ee
 		case <-ctx.Done():
-			// Close quit so the goroutine returns and doesn't leak.
-			// Do NOT close res because that can lead to panics in the goroutine.
-			// res will be garbage collected at some point.
-			close(quit)
 			return
 		}
 	}
