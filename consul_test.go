@@ -2,6 +2,7 @@ package consul
 
 import (
 	"context"
+	"sort"
 	"testing"
 	"time"
 
@@ -13,49 +14,77 @@ import (
 )
 
 func TestPopulateEndpoints(t *testing.T) {
-	tests := []struct {
-		name      string
-		input     [][]string
-		wantCalls [][]resolver.Address
+	t.Parallel()
+
+	tt := []struct {
+		name     string
+		nodeName string
+		input    []*api.ServiceEntry
+		want     []resolver.Address
 	}{
-		{"one",
-			[][]string{{"127.0.0.1:50051"}},
-			[][]resolver.Address{
+		{
+			name:     "one",
+			nodeName: "node-1",
+			input: []*api.ServiceEntry{
 				{
-					{Addr: "127.0.0.1:50051"},
+					Node: &api.Node{
+						Node: "node-1",
+					},
+					Service: &api.AgentService{
+						Address: "127.0.0.1",
+						Port:    50051,
+					},
 				},
+			},
+			want: []resolver.Address{
+				{Addr: "127.0.0.1:50051"},
 			},
 		},
-		{"sorted",
-			[][]string{
-				{"227.0.0.1:50051", "127.0.0.1:50051"},
-			},
-			[][]resolver.Address{
+		{
+			name:     "two",
+			nodeName: "node-2",
+			input: []*api.ServiceEntry{
 				{
-					{Addr: "127.0.0.1:50051"},
-					{Addr: "227.0.0.1:50051"},
+					Node: &api.Node{
+						Node: "node-1",
+					},
+					Service: &api.AgentService{
+						Address: "127.0.0.1",
+						Port:    50051,
+					},
 				},
+				{
+					Node: &api.Node{
+						Node: "node-2",
+					},
+					Service: &api.AgentService{
+						Address: "227.0.0.1",
+						Port:    50051,
+					},
+				},
+			},
+			want: []resolver.Address{
+				{Addr: "227.0.0.1:50051"},
+				{Addr: "127.0.0.1:50051"},
 			},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for i := range tt {
+		tc := tt[i]
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			ctrl := gomock.NewController(t)
-
-			in := make(chan []string, len(tt.input))
-
-			fcc := mocks.NewMockClientConn(ctrl)
-			for _, aa := range tt.wantCalls {
-				fcc.EXPECT().UpdateState(resolver.State{Addresses: aa}).Times(1)
-			}
+			clientConnMock := mocks.NewMockClientConn(ctrl)
+			clientConnMock.EXPECT().UpdateState(resolver.State{Addresses: tc.want})
 
 			ctx, cancel := context.WithCancel(context.Background())
 			t.Cleanup(cancel)
 
-			go populateEndpoints(ctx, fcc, in)
-			for _, i := range tt.input {
-				in <- i
-			}
+			in := make(chan []*api.ServiceEntry, 1)
+			in <- tc.input
+
+			go populateEndpoints(ctx, clientConnMock, in, tc.nodeName)
 
 			time.Sleep(time.Millisecond)
 		})
@@ -68,19 +97,49 @@ func TestWatchConsulService(t *testing.T) {
 		tgt              target
 		services         []*api.ServiceEntry
 		errorFromService error
-		want             []string
+		want             []*api.ServiceEntry
 	}{
 		{
-			name: "simple",
-			tgt:  target{Service: "svc", Wait: time.Second},
+			name: "no limit",
+			tgt: target{
+				Service: "svc",
+				Wait:    time.Second,
+			},
 			services: []*api.ServiceEntry{
 				{
 					Service: &api.AgentService{Address: "127.0.0.1", Port: 1024},
 				},
 			},
-			want: []string{"127.0.0.1:1024"},
+			want: []*api.ServiceEntry{
+				{
+					Service: &api.AgentService{Address: "127.0.0.1", Port: 1024},
+				},
+			},
 		},
-		// TODO: Add more tests-cases
+		{
+			name: "with limit",
+			tgt: target{
+				Service: "svc",
+				Wait:    time.Second,
+				Limit:   1,
+			},
+			services: []*api.ServiceEntry{
+				{
+					Service: &api.AgentService{Address: "129.0.0.1", Port: 1024},
+				},
+				{
+					Service: &api.AgentService{Address: "128.0.0.1", Port: 1024},
+				},
+				{
+					Service: &api.AgentService{Address: "127.0.0.1", Port: 1024},
+				},
+			},
+			want: []*api.ServiceEntry{
+				{
+					Service: &api.AgentService{Address: "129.0.0.1", Port: 1024},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -90,8 +149,8 @@ func TestWatchConsulService(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			var (
-				got []string
-				out = make(chan []string)
+				got []*api.ServiceEntry
+				out = make(chan []*api.ServiceEntry)
 			)
 			go func() {
 				for {
@@ -136,6 +195,234 @@ func TestWatchConsulService(t *testing.T) {
 			time.Sleep(5 * time.Millisecond)
 
 			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestSortSameNodeFirst(t *testing.T) {
+	t.Parallel()
+
+	tt := []struct {
+		name     string
+		nodeName string
+		in       []*api.ServiceEntry
+		expect   []*api.ServiceEntry
+	}{
+		{
+			name:     "one service on agent node",
+			nodeName: "node-1",
+			in: []*api.ServiceEntry{
+				{
+					Node: &api.Node{
+						Node: "node-1",
+					},
+					Service: &api.AgentService{
+						Address: "127.0.0.1",
+						Port:    50051,
+					},
+				},
+			},
+			expect: []*api.ServiceEntry{
+				{
+					Node: &api.Node{
+						Node: "node-1",
+					},
+					Service: &api.AgentService{
+						Address: "127.0.0.1",
+						Port:    50051,
+					},
+				},
+			},
+		},
+		{
+			name:     "one service on different node",
+			nodeName: "node-1",
+			in: []*api.ServiceEntry{
+				{
+					Node: &api.Node{
+						Node: "node-2",
+					},
+					Service: &api.AgentService{
+						Address: "127.0.0.1",
+						Port:    50051,
+					},
+				},
+			},
+			expect: []*api.ServiceEntry{
+				{
+					Node: &api.Node{
+						Node: "node-2",
+					},
+					Service: &api.AgentService{
+						Address: "127.0.0.1",
+						Port:    50051,
+					},
+				},
+			},
+		},
+		{
+			name:     "two services on agent node",
+			nodeName: "node-1",
+			in: []*api.ServiceEntry{
+				{
+					Node: &api.Node{
+						Node: "node-1",
+					},
+					Service: &api.AgentService{
+						Address: "227.0.0.1",
+						Port:    50051,
+					},
+				},
+				{
+					Node: &api.Node{
+						Node: "node-1",
+					},
+					Service: &api.AgentService{
+						Address: "127.0.0.1",
+						Port:    50051,
+					},
+				},
+			},
+			expect: []*api.ServiceEntry{
+				{
+					Node: &api.Node{
+						Node: "node-1",
+					},
+					Service: &api.AgentService{
+						Address: "127.0.0.1",
+						Port:    50051,
+					},
+				},
+				{
+					Node: &api.Node{
+						Node: "node-1",
+					},
+					Service: &api.AgentService{
+						Address: "227.0.0.1",
+						Port:    50051,
+					},
+				},
+			},
+		},
+		{
+			name:     "two services on different nodes",
+			nodeName: "node-1",
+			in: []*api.ServiceEntry{
+				{
+					Node: &api.Node{
+						Node: "node-1",
+					},
+					Service: &api.AgentService{
+						Address: "227.0.0.1",
+						Port:    50051,
+					},
+				},
+				{
+					Node: &api.Node{
+						Node: "node-2",
+					},
+					Service: &api.AgentService{
+						Address: "127.0.0.1",
+						Port:    50051,
+					},
+				},
+			},
+			expect: []*api.ServiceEntry{
+				{
+					Node: &api.Node{
+						Node: "node-1",
+					},
+					Service: &api.AgentService{
+						Address: "227.0.0.1",
+						Port:    50051,
+					},
+				},
+				{
+					Node: &api.Node{
+						Node: "node-2",
+					},
+					Service: &api.AgentService{
+						Address: "127.0.0.1",
+						Port:    50051,
+					},
+				},
+			},
+		},
+		{
+			name:     "three services on different nodes",
+			nodeName: "node-1",
+			in: []*api.ServiceEntry{
+				{
+					Node: &api.Node{
+						Node: "node-1",
+					},
+					Service: &api.AgentService{
+						Address: "192.168.235.110",
+						Port:    50051,
+					},
+				},
+				{
+					Node: &api.Node{
+						Node: "node-2",
+					},
+					Service: &api.AgentService{
+						Address: "192.168.235.116",
+						Port:    50051,
+					},
+				},
+				{
+					Node: &api.Node{
+						Node: "node-3",
+					},
+					Service: &api.AgentService{
+						Address: "192.168.235.115",
+						Port:    50051,
+					},
+				},
+			},
+			expect: []*api.ServiceEntry{
+				{
+					Node: &api.Node{
+						Node: "node-1",
+					},
+					Service: &api.AgentService{
+						Address: "192.168.235.110",
+						Port:    50051,
+					},
+				},
+				{
+					Node: &api.Node{
+						Node: "node-3",
+					},
+					Service: &api.AgentService{
+						Address: "192.168.235.115",
+						Port:    50051,
+					},
+				},
+				{
+					Node: &api.Node{
+						Node: "node-2",
+					},
+					Service: &api.AgentService{
+						Address: "192.168.235.116",
+						Port:    50051,
+					},
+				},
+			},
+		},
+	}
+
+	for i := range tt {
+		tc := tt[i]
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			sort.Sort(sameNodeFirst{
+				agentNodeName: tc.nodeName,
+				in:            tc.in,
+			})
+
+			require.Equal(t, tc.expect, tc.in)
 		})
 	}
 }

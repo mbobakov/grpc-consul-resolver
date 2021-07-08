@@ -37,83 +37,63 @@ type servicer interface {
 	Service(string, string, bool, *api.QueryOptions) ([]*api.ServiceEntry, *api.QueryMeta, error)
 }
 
-func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- []string) {
-	res := make(chan []string)
+func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- []*api.ServiceEntry) {
 	bck := &backoff.Backoff{
 		Factor: 2,
 		Jitter: true,
 		Min:    10 * time.Millisecond,
 		Max:    tgt.MaxBackoff,
 	}
-	go func() {
-		var lastIndex uint64
-		for {
-			ss, meta, err := s.Service(
-				tgt.Service,
-				tgt.Tag,
-				tgt.Healthy,
-				&api.QueryOptions{
-					WaitIndex:         lastIndex,
-					Near:              tgt.Near,
-					WaitTime:          tgt.Wait,
-					Datacenter:        tgt.Dc,
-					AllowStale:        tgt.AllowStale,
-					RequireConsistent: tgt.RequireConsistent,
-				},
-			)
-			if err != nil {
-				grpclog.Errorf("[Consul resolver] Couldn't fetch endpoints. target={%s}; error={%v}", tgt.String(), err)
-				time.Sleep(bck.Duration())
-				continue
-			}
 
-			bck.Reset()
-
-			if meta.LastIndex == lastIndex {
-				grpclog.Info("[Consul resolver] no change")
-				continue
-			}
-
-			if meta.LastIndex < lastIndex {
-				// according to https://www.consul.io/api-docs/features/blocking
-				// we should reset the index if it goes backward
-				lastIndex = 0
-			} else {
-				lastIndex = meta.LastIndex
-			}
-
-			grpclog.Infof("[Consul resolver] %d endpoints fetched in(+wait) %s for target={%s}",
-				len(ss),
-				meta.RequestTime,
-				tgt.String(),
-			)
-
-			ee := make([]string, 0, len(ss))
-			for _, s := range ss {
-				address := s.Service.Address
-				if s.Service.Address == "" {
-					address = s.Node.Address
-				}
-				ee = append(ee, fmt.Sprintf("%s:%d", address, s.Service.Port))
-			}
-
-			if tgt.Limit != 0 && len(ee) > tgt.Limit {
-				ee = ee[:tgt.Limit]
-			}
-
-			select {
-			case res <- ee:
-				continue
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
+	var lastIndex uint64
 	for {
+		ss, meta, err := s.Service(
+			tgt.Service,
+			tgt.Tag,
+			tgt.Healthy,
+			&api.QueryOptions{
+				WaitIndex:         lastIndex,
+				Near:              tgt.Near,
+				WaitTime:          tgt.Wait,
+				Datacenter:        tgt.Dc,
+				AllowStale:        tgt.AllowStale,
+				RequireConsistent: tgt.RequireConsistent,
+			},
+		)
+		if err != nil {
+			grpclog.Errorf("[Consul resolver] Couldn't fetch endpoints. target={%s}; error={%v}", tgt.String(), err)
+			time.Sleep(bck.Duration())
+			continue
+		}
+
+		bck.Reset()
+
+		if meta.LastIndex == lastIndex {
+			grpclog.Info("[Consul resolver] no change")
+			continue
+		}
+
+		if meta.LastIndex < lastIndex {
+			// according to https://www.consul.io/api-docs/features/blocking
+			// we should reset the index if it goes backward
+			lastIndex = 0
+		} else {
+			lastIndex = meta.LastIndex
+		}
+
+		grpclog.Infof("[Consul resolver] %d endpoints fetched in(+wait) %s for target={%s}",
+			len(ss),
+			meta.RequestTime,
+			tgt.String(),
+		)
+
+		if tgt.Limit != 0 && len(ss) > tgt.Limit {
+			ss = ss[:tgt.Limit]
+		}
+
 		select {
-		case ee := <-res:
-			out <- ee
+		case out <- ss:
+			continue
 		case <-ctx.Done():
 			return
 		}
@@ -123,17 +103,26 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 func populateEndpoints(
 	ctx context.Context,
 	clientConn resolver.ClientConn,
-	input <-chan []string,
+	input <-chan []*api.ServiceEntry,
+	agentNodeName string,
 ) {
 	for {
 		select {
-		case cc := <-input:
-			conns := make([]resolver.Address, 0, len(cc))
-			for _, c := range cc {
-				conns = append(conns, resolver.Address{Addr: c})
+		case in := <-input:
+			// sort services to not replace the same address list in the balancer.
+			sort.Sort(sameNodeFirst{
+				agentNodeName: agentNodeName,
+				in:            in,
+			})
+
+			addrs := make([]resolver.Address, 0, len(in))
+			for _, s := range in {
+				addrs = append(addrs, resolver.Address{
+					Addr: fmt.Sprintf("%s:%d", s.Service.Address, s.Service.Port),
+				})
 			}
-			sort.Sort(byAddressString(conns)) // Don't replace the same address list in the balancer
-			clientConn.UpdateState(resolver.State{Addresses: conns})
+
+			clientConn.UpdateState(resolver.State{Addresses: addrs})
 		case <-ctx.Done():
 			grpclog.Info("[Consul resolver] Watch has been finished")
 			return
@@ -141,9 +130,28 @@ func populateEndpoints(
 	}
 }
 
-// byAddressString sorts resolver.Address by Address Field  sorting in increasing order.
-type byAddressString []resolver.Address
+// sameNodeFirst sorts services so that services on the same
+// node go first, then go others in lexicographic order.
+type sameNodeFirst struct {
+	agentNodeName string
+	in            []*api.ServiceEntry
+}
 
-func (p byAddressString) Len() int           { return len(p) }
-func (p byAddressString) Less(i, j int) bool { return p[i].Addr < p[j].Addr }
-func (p byAddressString) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func (n sameNodeFirst) Len() int      { return len(n.in) }
+func (n sameNodeFirst) Swap(i, j int) { n.in[i], n.in[j] = n.in[j], n.in[i] }
+
+func (n sameNodeFirst) Less(i, j int) bool {
+	if n.in[i].Node.Node == n.agentNodeName && n.in[j].Node.Node == n.agentNodeName {
+		return n.in[i].Service.Address < n.in[j].Service.Address
+	}
+
+	if n.in[i].Node.Node == n.agentNodeName {
+		return true
+	}
+
+	if n.in[j].Node.Node == n.agentNodeName {
+		return false
+	}
+
+	return n.in[i].Service.Address < n.in[j].Service.Address
+}
