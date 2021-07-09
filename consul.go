@@ -8,6 +8,7 @@ import (
 
 	"github.com/hashicorp/consul/api"
 	"github.com/jpillora/backoff"
+	"google.golang.org/grpc/attributes"
 	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/resolver"
 )
@@ -100,6 +101,13 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 	}
 }
 
+type consulResolverKeyType string
+
+const (
+	createIndexKey = consulResolverKeyType("grpc.consul.resolver.create_index")
+	modifyIndexKey = consulResolverKeyType("grpc.consul.resolver.modify_index")
+)
+
 func populateEndpoints(
 	ctx context.Context,
 	clientConn resolver.ClientConn,
@@ -119,6 +127,10 @@ func populateEndpoints(
 			for _, s := range in {
 				addrs = append(addrs, resolver.Address{
 					Addr: fmt.Sprintf("%s:%d", s.Service.Address, s.Service.Port),
+					Attributes: attributes.New(
+						createIndexKey, s.Service.CreateIndex,
+						modifyIndexKey, s.Service.ModifyIndex,
+					),
 				})
 			}
 

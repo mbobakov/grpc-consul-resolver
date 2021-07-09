@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/consul/api"
 	"github.com/mbobakov/grpc-consul-resolver/internal/mocks"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/attributes"
 	"google.golang.org/grpc/resolver"
 )
 
@@ -31,13 +32,18 @@ func TestPopulateEndpoints(t *testing.T) {
 						Node: "node-1",
 					},
 					Service: &api.AgentService{
-						Address: "127.0.0.1",
-						Port:    50051,
+						Address:     "127.0.0.1",
+						Port:        50051,
+						CreateIndex: 100,
+						ModifyIndex: 100,
 					},
 				},
 			},
 			want: []resolver.Address{
-				{Addr: "127.0.0.1:50051"},
+				{
+					Addr:       "127.0.0.1:50051",
+					Attributes: attributes.New(createIndexKey, uint64(100), modifyIndexKey, uint64(100)),
+				},
 			},
 		},
 		{
@@ -49,8 +55,10 @@ func TestPopulateEndpoints(t *testing.T) {
 						Node: "node-1",
 					},
 					Service: &api.AgentService{
-						Address: "127.0.0.1",
-						Port:    50051,
+						Address:     "127.0.0.1",
+						Port:        50051,
+						CreateIndex: 100,
+						ModifyIndex: 100,
 					},
 				},
 				{
@@ -58,14 +66,22 @@ func TestPopulateEndpoints(t *testing.T) {
 						Node: "node-2",
 					},
 					Service: &api.AgentService{
-						Address: "227.0.0.1",
-						Port:    50051,
+						Address:     "227.0.0.1",
+						Port:        50051,
+						CreateIndex: 101,
+						ModifyIndex: 101,
 					},
 				},
 			},
 			want: []resolver.Address{
-				{Addr: "227.0.0.1:50051"},
-				{Addr: "127.0.0.1:50051"},
+				{
+					Addr:       "227.0.0.1:50051",
+					Attributes: attributes.New(createIndexKey, uint64(101), modifyIndexKey, uint64(101)),
+				},
+				{
+					Addr:       "127.0.0.1:50051",
+					Attributes: attributes.New(createIndexKey, uint64(100), modifyIndexKey, uint64(100)),
+				},
 			},
 		},
 	}
