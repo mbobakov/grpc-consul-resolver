@@ -63,9 +63,17 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 				},
 			)
 			if err != nil {
-				grpclog.Errorf("[Consul resolver] Couldn't fetch endpoints. target={%s}; error={%v}", tgt.String(), err)
-				time.Sleep(bck.Duration())
-				continue
+				// No need to continue if the context is done/cancelled.
+				// We check that here directly because the check for the closed quit channel
+				// at the end of the loop is not reached when calling continue here.
+				select {
+				case <-quit:
+					return
+				default:
+					grpclog.Errorf("[Consul resolver] Couldn't fetch endpoints. target={%s}; error={%v}", tgt.String(), err)
+					time.Sleep(bck.Duration())
+					continue
+				}
 			}
 			bck.Reset()
 			lastIndex = meta.LastIndex
@@ -97,13 +105,20 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 	}()
 
 	for {
+		// If in the below select both channels have values that can be read,
+		// Go picks one pseudo-randomly.
+		// But when the context is canceled we want to act upon it immediately.
+		if ctx.Err() != nil {
+			// Close quit so the goroutine returns and doesn't leak.
+			// Do NOT close res because that can lead to panics in the goroutine.
+			// res will be garbage collected at some point.
+			close(quit)
+			return
+		}
 		select {
 		case ee := <-res:
 			out <- ee
 		case <-ctx.Done():
-			// Close quit so the goroutine returns and doesn't leak.
-			// Do NOT close res because that can lead to panics in the goroutine.
-			// res will be garbage collected at some point.
 			close(quit)
 			return
 		}
