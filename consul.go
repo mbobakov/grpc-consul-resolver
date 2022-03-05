@@ -66,9 +66,10 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 				// No need to continue if the context is done/cancelled.
 				// We check that here directly because the check for the closed quit channel
 				// at the end of the loop is not reached when calling continue here.
-				if ctx.Err() != nil {
+				select {
+				case <-quit:
 					return
-				} else {
+				default:
 					grpclog.Errorf("[Consul resolver] Couldn't fetch endpoints. target={%s}; error={%v}", tgt.String(), err)
 					time.Sleep(bck.Duration())
 					continue
