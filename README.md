@@ -2,7 +2,10 @@
 
 Feature rich and easy-to-use resolver which return endpoints for service from the [Hashicorp Consul](https://www.consul.io) and watch for the changes.
 
-This library is *production ready* and will always *save backward-compatibility*
+grpc-consul-resolver version compatibility with [google.golang.org/grpc](https://pkg.go.dev/google.golang.org/grpc?tab=versions)
+
+* for `google.golang.org/grpc@v1.42.0` and above use `github.com/mbobakov/grpc-consul-resolver@v1.5.x`
+* for `google.golang.org/grpc@v1.41.0` and below use `github.com/mbobakov/grpc-consul-resolver@v1.4.x`
 
 ## Quick Start
 
