@@ -5,83 +5,94 @@
 package mocks
 
 import (
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	resolver "google.golang.org/grpc/resolver"
 	serviceconfig "google.golang.org/grpc/serviceconfig"
-	reflect "reflect"
 )
 
-// MockClientConn is a mock of ClientConn interface
+// MockClientConn is a mock of ClientConn interface.
 type MockClientConn struct {
 	ctrl     *gomock.Controller
 	recorder *MockClientConnMockRecorder
 }
 
-// MockClientConnMockRecorder is the mock recorder for MockClientConn
+// MockClientConnMockRecorder is the mock recorder for MockClientConn.
 type MockClientConnMockRecorder struct {
 	mock *MockClientConn
 }
 
-// NewMockClientConn creates a new mock instance
+// NewMockClientConn creates a new mock instance.
 func NewMockClientConn(ctrl *gomock.Controller) *MockClientConn {
 	mock := &MockClientConn{ctrl: ctrl}
 	mock.recorder = &MockClientConnMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockClientConn) EXPECT() *MockClientConnMockRecorder {
 	return m.recorder
 }
 
-// NewAddress mocks base method
+// NewAddress mocks base method.
 func (m *MockClientConn) NewAddress(arg0 []resolver.Address) {
+	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "NewAddress", arg0)
 }
 
-// NewAddress indicates an expected call of NewAddress
+// NewAddress indicates an expected call of NewAddress.
 func (mr *MockClientConnMockRecorder) NewAddress(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewAddress", reflect.TypeOf((*MockClientConn)(nil).NewAddress), arg0)
 }
 
-// NewServiceConfig mocks base method
+// NewServiceConfig mocks base method.
 func (m *MockClientConn) NewServiceConfig(arg0 string) {
+	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "NewServiceConfig", arg0)
 }
 
-// NewServiceConfig indicates an expected call of NewServiceConfig
+// NewServiceConfig indicates an expected call of NewServiceConfig.
 func (mr *MockClientConnMockRecorder) NewServiceConfig(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewServiceConfig", reflect.TypeOf((*MockClientConn)(nil).NewServiceConfig), arg0)
 }
 
-// ParseServiceConfig mocks base method
+// ParseServiceConfig mocks base method.
 func (m *MockClientConn) ParseServiceConfig(arg0 string) *serviceconfig.ParseResult {
+	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ParseServiceConfig", arg0)
 	ret0, _ := ret[0].(*serviceconfig.ParseResult)
 	return ret0
 }
 
-// ParseServiceConfig indicates an expected call of ParseServiceConfig
+// ParseServiceConfig indicates an expected call of ParseServiceConfig.
 func (mr *MockClientConnMockRecorder) ParseServiceConfig(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ParseServiceConfig", reflect.TypeOf((*MockClientConn)(nil).ParseServiceConfig), arg0)
 }
 
-// ReportError mocks base method
+// ReportError mocks base method.
 func (m *MockClientConn) ReportError(arg0 error) {
+	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "ReportError", arg0)
 }
 
-// ReportError indicates an expected call of ReportError
+// ReportError indicates an expected call of ReportError.
 func (mr *MockClientConnMockRecorder) ReportError(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReportError", reflect.TypeOf((*MockClientConn)(nil).ReportError), arg0)
 }
 
-// UpdateState mocks base method
+// UpdateState mocks base method.
 func (m *MockClientConn) UpdateState(arg0 resolver.State) {
+	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "UpdateState", arg0)
 }
 
-// UpdateState indicates an expected call of UpdateState
+// UpdateState indicates an expected call of UpdateState.
 func (mr *MockClientConnMockRecorder) UpdateState(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateState", reflect.TypeOf((*MockClientConn)(nil).UpdateState), arg0)
 }

@@ -70,7 +70,7 @@ func TestWatchConsulService(t *testing.T) {
 		errorFromService error
 		want             []string
 	}{
-		{"simple", target{Service: "svc", Wait: time.Second},
+		{"simple", target{Target: "svc", Wait: time.Second},
 			[]*api.ServiceEntry{
 				&api.ServiceEntry{
 					Service: &api.AgentService{Address: "127.0.0.1", Port: 1024},
@@ -102,7 +102,7 @@ func TestWatchConsulService(t *testing.T) {
 				}
 			}()
 			fconsul := mocks.NewMockservicer(ctrl)
-			fconsul.EXPECT().Service(tt.tgt.Service, tt.tgt.Tag, tt.tgt.Healthy, &api.QueryOptions{
+			fconsul.EXPECT().Service(tt.tgt.Target, tt.tgt.Tag, tt.tgt.Healthy, &api.QueryOptions{
 				WaitIndex:         0,
 				Near:              tt.tgt.Near,
 				WaitTime:          tt.tgt.Wait,
@@ -112,7 +112,7 @@ func TestWatchConsulService(t *testing.T) {
 			}).
 				Times(1).
 				Return(tt.services, &api.QueryMeta{LastIndex: 1}, tt.errorFromService)
-			fconsul.EXPECT().Service(tt.tgt.Service, tt.tgt.Tag, tt.tgt.Healthy, &api.QueryOptions{
+			fconsul.EXPECT().Service(tt.tgt.Target, tt.tgt.Tag, tt.tgt.Healthy, &api.QueryOptions{
 				WaitIndex:         1,
 				Near:              tt.tgt.Near,
 				WaitTime:          tt.tgt.Wait,
@@ -134,6 +134,76 @@ func TestWatchConsulService(t *testing.T) {
 			time.Sleep(5 * time.Millisecond)
 
 			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestWatchPeparedQuery(t *testing.T) {
+	tests := []struct {
+		name             string
+		tgt              target
+		responses        []*api.PreparedQueryExecuteResponse
+		errorFromService error
+		want             [][]string
+	}{
+		{"simple", target{Target: "myquery", PollInterval: 100 * time.Millisecond},
+			[]*api.PreparedQueryExecuteResponse{
+				{
+					Nodes: []api.ServiceEntry{
+						{
+							Service: &api.AgentService{Address: "127.0.0.1", Port: 1024},
+						},
+					},
+				},
+				{
+					Nodes: []api.ServiceEntry{
+						{
+							Service: &api.AgentService{Address: "127.0.0.2", Port: 1024},
+						},
+					},
+				},
+			},
+			nil,
+			[][]string{
+				{"127.0.0.1:1024"},
+				{"127.0.0.2:1024"},
+			},
+		},
+		// TODO: Add more tests-cases
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			i := 0
+			var out = make(chan []string, 1)
+			fconsul := mocks.NewMockquerier(ctrl)
+			fconsul.EXPECT().Execute(tt.tgt.Target, &api.QueryOptions{
+				Near:              tt.tgt.Near,
+				Datacenter:        tt.tgt.Dc,
+				AllowStale:        tt.tgt.AllowStale,
+				RequireConsistent: tt.tgt.RequireConsistent,
+			}).
+				Times(len(tt.responses)).
+				DoAndReturn(func(arg0 string, arg1 *api.QueryOptions) (*api.PreparedQueryExecuteResponse, *api.QueryMeta, error) {
+					v := tt.responses[i]
+					i++
+					return v, &api.QueryMeta{}, tt.errorFromService
+				})
+
+			go watchPreparedQuery(ctx, fconsul, tt.tgt, out)
+
+			for _, want := range tt.want {
+				select {
+				case <-ctx.Done():
+					return
+				case got := <-out:
+					require.Equal(t, want, got)
+				}
+			}
 		})
 	}
 }
