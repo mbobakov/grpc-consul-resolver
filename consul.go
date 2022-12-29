@@ -32,9 +32,13 @@ func (r *resolvr) Close() {
 }
 
 //go:generate mockgen -package mocks -destination internal/mocks/resolverClientConn.go  google.golang.org/grpc/resolver ClientConn
-//go:generate mockgen -package mocks -destination internal/mocks/servicer.go -source consul.go servicer
+//go:generate mockgen -package mocks -destination internal/mocks/consul.go -source consul.go servicer querier
 type servicer interface {
 	Service(string, string, bool, *api.QueryOptions) ([]*api.ServiceEntry, *api.QueryMeta, error)
+}
+
+type querier interface {
+	Execute(string, *api.QueryOptions) (*api.PreparedQueryExecuteResponse, *api.QueryMeta, error)
 }
 
 func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- []string) {
@@ -50,7 +54,7 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 		var lastIndex uint64
 		for {
 			ss, meta, err := s.Service(
-				tgt.Service,
+				tgt.Target,
 				tgt.Tag,
 				tgt.Healthy,
 				&api.QueryOptions{
@@ -97,6 +101,92 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 			}
 			select {
 			case res <- ee:
+				continue
+			case <-quit:
+				return
+			}
+		}
+	}()
+
+	for {
+		// If in the below select both channels have values that can be read,
+		// Go picks one pseudo-randomly.
+		// But when the context is canceled we want to act upon it immediately.
+		if ctx.Err() != nil {
+			// Close quit so the goroutine returns and doesn't leak.
+			// Do NOT close res because that can lead to panics in the goroutine.
+			// res will be garbage collected at some point.
+			close(quit)
+			return
+		}
+		select {
+		case ee := <-res:
+			out <- ee
+		case <-ctx.Done():
+			close(quit)
+			return
+		}
+	}
+}
+
+func watchPreparedQuery(ctx context.Context, q querier, tgt target, out chan<- []string) {
+	res := make(chan []string)
+	quit := make(chan struct{})
+	bck := &backoff.Backoff{
+		Factor: 2,
+		Jitter: true,
+		Min:    10 * time.Millisecond,
+		Max:    tgt.MaxBackoff,
+	}
+	go func() {
+		ticker := time.NewTicker(tgt.PollInterval)
+		defer ticker.Stop()
+
+		for {
+			ss, meta, err := q.Execute(
+				tgt.Target,
+				&api.QueryOptions{
+					Near:              tgt.Near,
+					Datacenter:        tgt.Dc,
+					AllowStale:        tgt.AllowStale,
+					RequireConsistent: tgt.RequireConsistent,
+				},
+			)
+			if err != nil {
+				// No need to continue if the context is done/cancelled.
+				// We check that here directly because the check for the closed quit channel
+				// at the end of the loop is not reached when calling continue here.
+				select {
+				case <-quit:
+					return
+				default:
+					grpclog.Errorf("[Consul resolver] Couldn't fetch endpoints. target={%s}; error={%v}", tgt.String(), err)
+					time.Sleep(bck.Duration())
+					continue
+				}
+			}
+			bck.Reset()
+			grpclog.Infof("[Consul resolver] %d endpoints fetched in %s for target={%s}",
+				len(ss.Nodes),
+				meta.RequestTime,
+				tgt.String(),
+			)
+
+			ee := make([]string, 0, len(ss.Nodes))
+			for _, s := range ss.Nodes {
+				address := s.Service.Address
+				if s.Service.Address == "" {
+					address = s.Node.Address
+				}
+				ee = append(ee, fmt.Sprintf("%s:%d", address, s.Service.Port))
+			}
+
+			if tgt.Limit != 0 && len(ee) > tgt.Limit {
+				ee = ee[:tgt.Limit]
+			}
+			select {
+			case res <- ee:
+				<-ticker.C
 				continue
 			case <-quit:
 				return

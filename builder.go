@@ -29,7 +29,13 @@ func (b *builder) Build(url resolver.Target, cc resolver.ClientConn, opts resolv
 
 	ctx, cancel := context.WithCancel(context.Background())
 	pipe := make(chan []string)
-	go watchConsulService(ctx, cli.Health(), tgt, pipe)
+	switch tgt.Type {
+	case targetTypeService:
+		go watchConsulService(ctx, cli.Health(), tgt, pipe)
+	case targetTypePreparedQuery:
+		go watchPreparedQuery(ctx, cli.PreparedQuery(), tgt, pipe)
+	}
+
 	go populateEndpoints(ctx, cc, pipe)
 
 	return &resolvr{cancelFunc: cancel}, nil
