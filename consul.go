@@ -89,6 +89,10 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 				if s.Service.Address == "" {
 					address = s.Node.Address
 				}
+				if s.Service.Port == 0 {
+					ee = append(ee, fmt.Sprintf("%s", address))
+					continue
+				}
 				ee = append(ee, fmt.Sprintf("%s:%d", address, s.Service.Port))
 			}
 
