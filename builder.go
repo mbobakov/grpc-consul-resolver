@@ -17,7 +17,9 @@ const schemeName = "consul"
 type builder struct{}
 
 func (b *builder) Build(url resolver.Target, cc resolver.ClientConn, opts resolver.BuildOptions) (resolver.Resolver, error) {
-	dsn := strings.Join([]string{schemeName + ":/", url.Authority, url.Endpoint}, "/")
+	//dsn := strings.Join([]string{schemeName + ":/", url.Authority, url.Endpoint}, "/")
+	//dsn += "?" + url.URL.RawQuery
+	dsn := strings.Join([]string{schemeName + ":/", url.URL.Host, url.URL.Path + "?" + url.URL.RawQuery}, "/")
 	tgt, err := parseURL(dsn)
 	if err != nil {
 		return nil, errors.Wrap(err, "Wrong consul URL")
