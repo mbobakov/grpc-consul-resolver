@@ -1,0 +1,59 @@
+name: Build
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+jobs:
+  go-linter:
+    name: Go Linter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: golangci/golangci-lint-action@v2
+        with:
+          version: v1.52.0
+          args: --timeout=5m
+
+  run-tests:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setting up go
+        uses: actions/setup-go@v3
+        with:
+          go-version: "^1.20.1"
+      - name: Run unit tests
+        run: make test
+      - name: Run integration tests
+        run: make test-integration
+
+  create-release:
+    name: Create Release
+    if: ${{ github.ref == 'refs/heads/master' }}
+    needs: [build-image, run-tests, go-linter]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Conventional Changelog Action
+        uses: TriPSs/conventional-changelog-action@v3
+        id: changelog
+        with:
+          github-token: ${{ secrets.github_token }}
+          skip-commit: true
+          preset: conventionalcommits
+      - name: Create Release
+        uses: actions/create-release@v1
+        if: ${{ steps.changelog.outputs.skipped == 'false' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.github_token }}
+        with:
+          tag_name: ${{ steps.changelog.outputs.tag }}
+          release_name: Version ${{ steps.changelog.outputs.tag }}
+          body: ${{ steps.changelog.outputs.clean_changelog }}
+    outputs:
+      tag: ${{ steps.changelog.outputs.tag }}
+      skipped: ${{ steps.changelog.outputs.skipped }}
