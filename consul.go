@@ -31,8 +31,7 @@ func (r *resolvr) Close() {
 	r.cancelFunc()
 }
 
-//go:generate mockgen -package mocks -destination internal/mocks/resolverClientConn.go  google.golang.org/grpc/resolver ClientConn
-//go:generate mockgen -package mocks -destination internal/mocks/servicer.go -source consul.go servicer
+//go:generate ./bin/moq -out mocks_test.go . servicer
 type servicer interface {
 	Service(string, string, bool, *api.QueryOptions) ([]*api.ServiceEntry, *api.QueryMeta, error)
 }
@@ -138,7 +137,11 @@ func populateEndpoints(ctx context.Context, clientConn resolver.ClientConn, inpu
 				conns = append(conns, resolver.Address{Addr: c})
 			}
 			sort.Sort(byAddressString(conns)) // Don't replace the same address list in the balancer
-			clientConn.UpdateState(resolver.State{Addresses: conns})
+			err := clientConn.UpdateState(resolver.State{Addresses: conns})
+			if err != nil {
+				grpclog.Errorf("[Consul resolver] Couldn't update client connection. error={%v}", err)
+				continue
+			}
 		case <-ctx.Done():
 			grpclog.Info("[Consul resolver] Watch has been finished")
 			return

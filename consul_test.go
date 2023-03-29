@@ -5,59 +5,51 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/hashicorp/consul/api"
-	"github.com/mbobakov/grpc-consul-resolver/internal/mocks"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/resolver"
 )
 
 func TestPopulateEndpoints(t *testing.T) {
 	tests := []struct {
-		name      string
-		input     [][]string
-		wantCalls [][]resolver.Address
+		name     string
+		input    []string
+		wantCall []resolver.Address
 	}{
 		{"one",
-			[][]string{{"127.0.0.1:50051"}},
-			[][]resolver.Address{
-				[]resolver.Address{
-					{Addr: "127.0.0.1:50051"},
-				},
+			[]string{"127.0.0.1:50051"},
+			[]resolver.Address{
+				{Addr: "127.0.0.1:50051"},
 			},
 		},
 		{"sorted",
-			[][]string{
-				{"227.0.0.1:50051", "127.0.0.1:50051"},
-			},
-			[][]resolver.Address{
-				[]resolver.Address{
-					{Addr: "127.0.0.1:50051"},
-					{Addr: "227.0.0.1:50051"},
-				},
+			[]string{"227.0.0.1:50051", "127.0.0.1:50051"},
+			[]resolver.Address{
+				{Addr: "127.0.0.1:50051"},
+				{Addr: "227.0.0.1:50051"},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 			var (
 				in = make(chan []string, len(tt.input))
 			)
 
-			fcc := mocks.NewMockClientConn(ctrl)
-			for _, aa := range tt.wantCalls {
-				fcc.EXPECT().UpdateState(resolver.State{Addresses: aa}).Times(1)
+			fcc := &ClientConnMock{
+				UpdateStateFunc: func(state resolver.State) error {
+					require.Equal(t, tt.wantCall, state.Addresses)
+					return nil
+				},
 			}
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			go populateEndpoints(ctx, fcc, in)
-			for _, i := range tt.input {
-				in <- i
-			}
+			in <- tt.input
 			time.Sleep(time.Millisecond)
+
+			require.Equal(t, 1, len(fcc.UpdateStateCalls()))
 		})
 	}
 }
@@ -72,7 +64,7 @@ func TestWatchConsulService(t *testing.T) {
 	}{
 		{"simple", target{Service: "svc", Wait: time.Second},
 			[]*api.ServiceEntry{
-				&api.ServiceEntry{
+				{
 					Service: &api.AgentService{Address: "127.0.0.1", Port: 1024},
 				},
 			},
@@ -85,8 +77,6 @@ func TestWatchConsulService(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
 
 			var (
 				got []string
@@ -101,34 +91,20 @@ func TestWatchConsulService(t *testing.T) {
 					}
 				}
 			}()
-			fconsul := mocks.NewMockservicer(ctrl)
-			fconsul.EXPECT().Service(tt.tgt.Service, tt.tgt.Tag, tt.tgt.Healthy, &api.QueryOptions{
-				WaitIndex:         0,
-				Near:              tt.tgt.Near,
-				WaitTime:          tt.tgt.Wait,
-				Datacenter:        tt.tgt.Dc,
-				AllowStale:        tt.tgt.AllowStale,
-				RequireConsistent: tt.tgt.RequireConsistent,
-			}).
-				Times(1).
-				Return(tt.services, &api.QueryMeta{LastIndex: 1}, tt.errorFromService)
-			fconsul.EXPECT().Service(tt.tgt.Service, tt.tgt.Tag, tt.tgt.Healthy, &api.QueryOptions{
-				WaitIndex:         1,
-				Near:              tt.tgt.Near,
-				WaitTime:          tt.tgt.Wait,
-				Datacenter:        tt.tgt.Dc,
-				AllowStale:        tt.tgt.AllowStale,
-				RequireConsistent: tt.tgt.RequireConsistent,
-			}).
-				Do(
-					func(svc string, tag string, h bool, opt *api.QueryOptions) ([]*api.ServiceEntry, *api.QueryMeta, error) {
-						if opt.WaitIndex > 0 {
-							select {}
-						}
-						return tt.services, &api.QueryMeta{LastIndex: 1}, tt.errorFromService
-					},
-				).Times(1).
-				Return(tt.services, &api.QueryMeta{LastIndex: 1}, tt.errorFromService)
+			fconsul := &servicerMock{
+				ServiceFunc: func(s1, s2 string, b bool, queryOptions *api.QueryOptions) ([]*api.ServiceEntry, *api.QueryMeta, error) {
+					require.Equal(t, tt.tgt.Service, s1)
+					require.Equal(t, tt.tgt.Tag, s2)
+					require.Equal(t, tt.tgt.Healthy, b)
+					require.Equal(t, tt.tgt.Near, queryOptions.Near)
+					require.Equal(t, tt.tgt.Wait, queryOptions.WaitTime)
+					require.Equal(t, tt.tgt.Dc, queryOptions.Datacenter)
+					require.Equal(t, tt.tgt.AllowStale, queryOptions.AllowStale)
+					require.Equal(t, tt.tgt.RequireConsistent, queryOptions.RequireConsistent)
+
+					return tt.services, &api.QueryMeta{LastIndex: 1}, tt.errorFromService
+				},
+			}
 
 			go watchConsulService(ctx, fconsul, tt.tgt, out)
 			time.Sleep(5 * time.Millisecond)
