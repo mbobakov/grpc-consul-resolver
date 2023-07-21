@@ -14,10 +14,12 @@ DOCKER_IMAGE ?= connectivity_controller
 
 export GOPRIVATE=github.com/reemote/*
 export PATH := ${BIN_DIR}:$(PATH)
+export GOBIN := ${BIN_DIR}
 
 tools: ## Installing tools from tools.go
-	- echo Installing tools from tools.go
-	- cat tools.go | grep _ | awk -F'"' '{print $$2}' | xargs -tI % env GOBIN=${BIN_DIR} go install %
+	echo Installing tools
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
+	go install github.com/matryer/moq@v0.3.1
 
 .PHONY: clean
 clean: ## run all cleanup tasks
