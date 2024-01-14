@@ -29,15 +29,22 @@ type target struct {
 	Dc                string        `form:"dc"`
 	AllowStale        bool          `form:"allow-stale"`
 	RequireConsistent bool          `form:"require-consistent"`
-	// TODO(mbobakov): custom parameters for the http-transport
 	// TODO(mbobakov): custom parameters for the TLS subsystem
+
+	// custom parameters for the http-transport
+	MaxIdleConns          int           `form:"max-idle-conns"`
+	IdleConnTimeout       time.Duration `form:"idle-conn-timeout"`
+	DisableCompression    bool          `form:"disable-compression"`
+	TLSHandshakeTimeout   time.Duration `form:"tls-handshake-timeout"`
+	ExpectContinueTimeout time.Duration `form:"expect-continue-timeout"`
 }
 
 func (t *target) String() string {
 	return fmt.Sprintf("service='%s' healthy='%t' tag='%s'", t.Service, t.Healthy, t.Tag)
 }
 
-//  parseURL with parameters
+//	parseURL with parameters
+//
 // see README.md for the actual format
 // URL schema will stay stable in the future for backward compatibility
 func parseURL(u string) (target, error) {
@@ -75,6 +82,23 @@ func parseURL(u string) (target, error) {
 	return tgt, nil
 }
 
+// createHttpTransport returns a customized http.Transport based on the values stored in the target struct.
+// The returned http.Transport has the following properties:
+// - MaxIdleConns: maximum number of idle connections
+// - IdleConnTimeout: maximum amount of time an idle (keep-alive) connection will remain idle before being closed
+// - TLSHandshakeTimeout: maximum amount of time to wait for a TLS handshake to complete
+// - ExpectContinueTimeout: maximum amount of time to wait for a 100-continue response before sending the request body
+// - DisableCompression: whether to disable the compression of response bodies (gzip)
+func (t *target) createHttpTransport() *http.Transport {
+	return &http.Transport{
+		MaxIdleConns:          t.MaxIdleConns,
+		IdleConnTimeout:       t.IdleConnTimeout,
+		TLSHandshakeTimeout:   t.TLSHandshakeTimeout,
+		ExpectContinueTimeout: t.ExpectContinueTimeout,
+		DisableCompression:    t.DisableCompression,
+	}
+}
+
 // consulConfig returns config based on the parsed target.
 // It uses custom http-client.
 func (t *target) consulConfig() *api.Config {
@@ -86,7 +110,8 @@ func (t *target) consulConfig() *api.Config {
 	}
 	// custom http.Client
 	c := &http.Client{
-		Timeout: t.Timeout,
+		Timeout:   t.Timeout,
+		Transport: t.createHttpTransport(),
 	}
 	return &api.Config{
 		Address:    t.Addr,
