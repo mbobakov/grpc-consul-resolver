@@ -16,7 +16,7 @@ import (
 	"google.golang.org/grpc/grpclog"
 )
 
-func TestCLient(t *testing.T) {
+func TestClient(t *testing.T) {
 	logger := logrus.New()
 	grpclog.SetLoggerV2(&grpcLog{logger})
 

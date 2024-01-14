@@ -15,20 +15,25 @@ For full example see [this section](#example)
 
 *Parameters:*
 
-| Name               | Format                   | Description                                                                                                                   |
-|--------------------|--------------------------|-------------------------------------------------------------------------------------------------------------------------------|
-| tag                | string                   | Select endpoints only with this tag                                                                                           |
-| healthy            | true/false               | Return only endpoints which pass all health-checks. Default: false                                                            |
-| wait               | as in time.ParseDuration | Wait time for watch changes. Due this time period endpoints will be force refreshed. Default: inherits agent property         |
-| insecure           | true/false               | Allow insecure communication with Consul. Default: true                                                                       |
-| near               | string                   | Sort endpoints by response duration. Can be efficient combine with `limit` parameter default: "_agent"                        |
-| limit              | int                      | Limit number of endpoints for the service. Default: no limit                                                                  |
-| timeout            | as in time.ParseDuration | Http-client timeout. Default: 60s                                                                                             |
-| max-backoff        | as in time.ParseDuration | Max backoff time for reconnect to consul. Reconnects will start from 10ms to _max-backoff_ exponentialy with factor 2.  Default: 1s |
-| token              | string                   | Consul token                                                                                                                  |
-| dc                 | string                   | Consul datacenter to choose. Optional                                                                                         |
-| allow-stale        | true/false               | Allow stale results from the agent. https://www.consul.io/api/features/consistency.html#stale                                 |
-| require-consistent | true/false               | RequireConsistent forces the read to be fully consistent. This is more expensive but prevents ever performing a stale read.   |
+| Name                    | Format                   | Description                                                                                                                         |
+|-------------------------|--------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| tag                     | string                   | Select endpoints only with this tag                                                                                                 |
+| healthy                 | true/false               | Return only endpoints which pass all health-checks. Default: false                                                                  |
+| wait                    | as in time.ParseDuration | Wait time for watch changes. Due this time period endpoints will be force refreshed. Default: inherits agent property               |
+| insecure                | true/false               | Allow insecure communication with Consul. Default: true                                                                             |
+| near                    | string                   | Sort endpoints by response duration. Can be efficient combine with `limit` parameter default: "_agent"                              |
+| limit                   | int                      | Limit number of endpoints for the service. Default: no limit                                                                        |
+| timeout                 | as in time.ParseDuration | Http-client timeout. Default: 60s                                                                                                   |
+| max-backoff             | as in time.ParseDuration | Max backoff time for reconnect to consul. Reconnects will start from 10ms to _max-backoff_ exponentialy with factor 2.  Default: 1s |
+| token                   | string                   | Consul token                                                                                                                        |
+| dc                      | string                   | Consul datacenter to choose. Optional                                                                                               |
+| allow-stale             | true/false               | Allow stale results from the agent. https://www.consul.io/api/features/consistency.html#stale                                       |
+| require-consistent      | true/false               | RequireConsistent forces the read to be fully consistent. This is more expensive but prevents ever performing a stale read.         |
+| max-idle-conns          | int                      | Maximum number of idle connections. Default: 0                                                                                      |
+| idle-conn-timeout       | as in time.ParseDuration | Maximum amount of time an idle (keep-alive) connection will remain idle before being closed. Default: 0s                            |
+| disable-compression     | true/false               | Disable compression for connections to consul. Default: false                                                                       |
+| tls-handshake-timeout   | as in time.ParseDuration | Maximum amount of time to wait for a TLS handshake to complete. Default: 0s                                                         |
+| expect-continue-timeout | as in time.ParseDuration | Maximum amount of time to wait for a 100-continue response before sending the request body. Default: 0s                             |
 
 ## Example
 ```go
