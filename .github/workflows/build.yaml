@@ -7,17 +7,7 @@ on:
       - master
 
 jobs:
-  go-linter:
-    name: Go Linter
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: golangci/golangci-lint-action@v2
-        with:
-          version: v1.52.0
-          args: --timeout=5m
-
-  run-tests:
+  lint-and-tests:
     name: Run Tests
     runs-on: ubuntu-latest
     steps:
@@ -26,6 +16,8 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: "^1.20.1"
+      - name:  lint
+        run: make lint
       - name: Run unit tests
         run: make test
       - name: Run integration tests
@@ -34,7 +26,7 @@ jobs:
   create-release:
     name: Create Release
     if: ${{ github.ref == 'refs/heads/master' }}
-    needs: [run-tests, go-linter]
+    needs: [lint-and-tests]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
