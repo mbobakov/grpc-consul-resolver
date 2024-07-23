@@ -62,7 +62,7 @@ func TestWatchConsulService(t *testing.T) {
 		errorFromService error
 		want             []string
 	}{
-		{"simple", target{Service: "svc", Wait: time.Second},
+		{"simple", target{Service: "svc", Tags: []string{"foo", "bar"}, Wait: time.Second},
 			[]*api.ServiceEntry{
 				{
 					Service: &api.AgentService{Address: "127.0.0.1", Port: 1024},
@@ -92,9 +92,9 @@ func TestWatchConsulService(t *testing.T) {
 				}
 			}()
 			fconsul := &servicerMock{
-				ServiceFunc: func(s1, s2 string, b bool, queryOptions *api.QueryOptions) ([]*api.ServiceEntry, *api.QueryMeta, error) {
+				ServiceMultipleTagsFunc: func(s1 string, s2 []string, b bool, queryOptions *api.QueryOptions) ([]*api.ServiceEntry, *api.QueryMeta, error) {
 					require.Equal(t, tt.tgt.Service, s1)
-					require.Equal(t, tt.tgt.Tag, s2)
+					require.Equal(t, tt.tgt.Tags, s2)
 					require.Equal(t, tt.tgt.Healthy, b)
 					require.Equal(t, tt.tgt.Near, queryOptions.Near)
 					require.Equal(t, tt.tgt.Wait, queryOptions.WaitTime)

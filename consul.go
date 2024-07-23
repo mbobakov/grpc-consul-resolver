@@ -33,7 +33,7 @@ func (r *resolvr) Close() {
 
 //go:generate ./bin/moq -out mocks_test.go . servicer
 type servicer interface {
-	Service(string, string, bool, *api.QueryOptions) ([]*api.ServiceEntry, *api.QueryMeta, error)
+	ServiceMultipleTags(string, []string, bool, *api.QueryOptions) ([]*api.ServiceEntry, *api.QueryMeta, error)
 }
 
 func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- []string) {
@@ -48,9 +48,9 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 	go func() {
 		var lastIndex uint64
 		for {
-			ss, meta, err := s.Service(
+			ss, meta, err := s.ServiceMultipleTags(
 				tgt.Service,
-				tgt.Tag,
+				tgt.Tags,
 				tgt.Healthy,
 				&api.QueryOptions{
 					WaitIndex:         lastIndex,

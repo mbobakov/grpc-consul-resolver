@@ -20,7 +20,7 @@ type target struct {
 	Wait              time.Duration `form:"wait"`
 	Timeout           time.Duration `form:"timeout"`
 	MaxBackoff        time.Duration `form:"max-backoff"`
-	Tag               string        `form:"tag"`
+	Tags              []string      `form:"tag"`
 	Near              string        `form:"near"`
 	Limit             int           `form:"limit"`
 	Healthy           bool          `form:"healthy"`
@@ -34,10 +34,11 @@ type target struct {
 }
 
 func (t *target) String() string {
-	return fmt.Sprintf("service='%s' healthy='%t' tag='%s'", t.Service, t.Healthy, t.Tag)
+	return fmt.Sprintf("service='%s' healthy='%t' tag='%+v'", t.Service, t.Healthy, t.Tags)
 }
 
-//  parseURL with parameters
+//	parseURL with parameters
+//
 // see README.md for the actual format
 // URL schema will stay stable in the future for backward compatibility
 func parseURL(u string) (target, error) {

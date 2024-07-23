@@ -18,8 +18,8 @@ var _ servicer = &servicerMock{}
 //
 //		// make and configure a mocked servicer
 //		mockedservicer := &servicerMock{
-//			ServiceFunc: func(s1 string, s2 string, b bool, queryOptions *api.QueryOptions) ([]*api.ServiceEntry, *api.QueryMeta, error) {
-//				panic("mock out the Service method")
+//			ServiceMultipleTagsFunc: func(s string, strings []string, b bool, queryOptions *api.QueryOptions) ([]*api.ServiceEntry, *api.QueryMeta, error) {
+//				panic("mock out the ServiceMultipleTags method")
 //			},
 //		}
 //
@@ -28,66 +28,66 @@ var _ servicer = &servicerMock{}
 //
 //	}
 type servicerMock struct {
-	// ServiceFunc mocks the Service method.
-	ServiceFunc func(s1 string, s2 string, b bool, queryOptions *api.QueryOptions) ([]*api.ServiceEntry, *api.QueryMeta, error)
+	// ServiceMultipleTagsFunc mocks the ServiceMultipleTags method.
+	ServiceMultipleTagsFunc func(s string, strings []string, b bool, queryOptions *api.QueryOptions) ([]*api.ServiceEntry, *api.QueryMeta, error)
 
 	// calls tracks calls to the methods.
 	calls struct {
-		// Service holds details about calls to the Service method.
-		Service []struct {
-			// S1 is the s1 argument value.
-			S1 string
-			// S2 is the s2 argument value.
-			S2 string
+		// ServiceMultipleTags holds details about calls to the ServiceMultipleTags method.
+		ServiceMultipleTags []struct {
+			// S is the s argument value.
+			S string
+			// Strings is the strings argument value.
+			Strings []string
 			// B is the b argument value.
 			B bool
 			// QueryOptions is the queryOptions argument value.
 			QueryOptions *api.QueryOptions
 		}
 	}
-	lockService sync.RWMutex
+	lockServiceMultipleTags sync.RWMutex
 }
 
-// Service calls ServiceFunc.
-func (mock *servicerMock) Service(s1 string, s2 string, b bool, queryOptions *api.QueryOptions) ([]*api.ServiceEntry, *api.QueryMeta, error) {
-	if mock.ServiceFunc == nil {
-		panic("servicerMock.ServiceFunc: method is nil but servicer.Service was just called")
+// ServiceMultipleTags calls ServiceMultipleTagsFunc.
+func (mock *servicerMock) ServiceMultipleTags(s string, strings []string, b bool, queryOptions *api.QueryOptions) ([]*api.ServiceEntry, *api.QueryMeta, error) {
+	if mock.ServiceMultipleTagsFunc == nil {
+		panic("servicerMock.ServiceMultipleTagsFunc: method is nil but servicer.ServiceMultipleTags was just called")
 	}
 	callInfo := struct {
-		S1           string
-		S2           string
+		S            string
+		Strings      []string
 		B            bool
 		QueryOptions *api.QueryOptions
 	}{
-		S1:           s1,
-		S2:           s2,
+		S:            s,
+		Strings:      strings,
 		B:            b,
 		QueryOptions: queryOptions,
 	}
-	mock.lockService.Lock()
-	mock.calls.Service = append(mock.calls.Service, callInfo)
-	mock.lockService.Unlock()
-	return mock.ServiceFunc(s1, s2, b, queryOptions)
+	mock.lockServiceMultipleTags.Lock()
+	mock.calls.ServiceMultipleTags = append(mock.calls.ServiceMultipleTags, callInfo)
+	mock.lockServiceMultipleTags.Unlock()
+	return mock.ServiceMultipleTagsFunc(s, strings, b, queryOptions)
 }
 
-// ServiceCalls gets all the calls that were made to Service.
+// ServiceMultipleTagsCalls gets all the calls that were made to ServiceMultipleTags.
 // Check the length with:
 //
-//	len(mockedservicer.ServiceCalls())
-func (mock *servicerMock) ServiceCalls() []struct {
-	S1           string
-	S2           string
+//	len(mockedservicer.ServiceMultipleTagsCalls())
+func (mock *servicerMock) ServiceMultipleTagsCalls() []struct {
+	S            string
+	Strings      []string
 	B            bool
 	QueryOptions *api.QueryOptions
 } {
 	var calls []struct {
-		S1           string
-		S2           string
+		S            string
+		Strings      []string
 		B            bool
 		QueryOptions *api.QueryOptions
 	}
-	mock.lockService.RLock()
-	calls = mock.calls.Service
-	mock.lockService.RUnlock()
+	mock.lockServiceMultipleTags.RLock()
+	calls = mock.calls.ServiceMultipleTags
+	mock.lockServiceMultipleTags.RUnlock()
 	return calls
 }
