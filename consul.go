@@ -21,10 +21,16 @@ func init() {
 // It watches for endpoints changes and pushes them to the underlying gRPC connection.
 type resolvr struct {
 	cancelFunc context.CancelFunc
+	rn         chan struct{}
 }
 
-// ResolveNow will be skipped due unnecessary in this case
-func (r *resolvr) ResolveNow(resolver.ResolveNowOptions) {}
+// ResolveNow triggers an immediate refresh from Consul.
+func (r *resolvr) ResolveNow(resolver.ResolveNowOptions) {
+	select {
+	case r.rn <- struct{}{}:
+	default:
+	}
+}
 
 // Close closes the resolver.
 func (r *resolvr) Close() {
@@ -36,7 +42,7 @@ type servicer interface {
 	Service(string, string, bool, *api.QueryOptions) ([]*api.ServiceEntry, *api.QueryMeta, error)
 }
 
-func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- []string) {
+func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- []string, rn chan struct{}) {
 	res := make(chan []string)
 	quit := make(chan struct{})
 	bck := &backoff.Backoff{
@@ -45,28 +51,60 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 		Min:    10 * time.Millisecond,
 		Max:    tgt.MaxBackoff,
 	}
+
+	if tgt.RefreshInterval > 0 {
+		ticker := time.NewTicker(tgt.RefreshInterval)
+		go func() {
+			for {
+				select {
+				case <-ticker.C:
+					select {
+					case rn <- struct{}{}:
+					default:
+					}
+				case <-ctx.Done():
+					ticker.Stop()
+					return
+				}
+			}
+		}()
+	}
+
 	go func() {
 		var lastIndex uint64
 		for {
+			qctx, qcancel := context.WithCancel(ctx)
+			resetIndex := make(chan struct{})
+			go func() {
+				select {
+				case <-rn:
+					close(resetIndex)
+					qcancel()
+				case <-qctx.Done():
+				}
+			}()
 			ss, meta, err := s.Service(
 				tgt.Service,
 				tgt.Tag,
 				tgt.Healthy,
-				&api.QueryOptions{
+				(&api.QueryOptions{
 					WaitIndex:         lastIndex,
 					Near:              tgt.Near,
 					WaitTime:          tgt.Wait,
 					Datacenter:        tgt.Dc,
 					AllowStale:        tgt.AllowStale,
 					RequireConsistent: tgt.RequireConsistent,
-				},
+				}).WithContext(qctx),
 			)
+			qcancel()
 			if err != nil {
-				// No need to continue if the context is done/cancelled.
-				// We check that here directly because the check for the closed quit channel
-				// at the end of the loop is not reached when calling continue here.
 				select {
+				case <-resetIndex:
+					lastIndex = 0
+					continue
 				case <-quit:
+					return
+				case <-ctx.Done():
 					return
 				default:
 					grpclog.Errorf("[Consul resolver] Couldn't fetch endpoints. target={%s}; error={%v}", tgt.String(), err)
@@ -75,7 +113,12 @@ func watchConsulService(ctx context.Context, s servicer, tgt target, out chan<- 
 				}
 			}
 			bck.Reset()
-			lastIndex = meta.LastIndex
+			select {
+			case <-resetIndex:
+				lastIndex = 0
+			default:
+				lastIndex = meta.LastIndex
+			}
 			grpclog.Infof("[Consul resolver] %d endpoints fetched in(+wait) %s for target={%s}",
 				len(ss),
 				meta.RequestTime,

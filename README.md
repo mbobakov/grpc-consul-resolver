@@ -29,6 +29,7 @@ For full example see [this section](#example)
 | dc                 | string                   | Consul datacenter to choose. Optional                                                                                         |
 | allow-stale        | true/false               | Allow stale results from the agent. https://www.consul.io/api/features/consistency.html#stale                                 |
 | require-consistent | true/false               | RequireConsistent forces the read to be fully consistent. This is more expensive but prevents ever performing a stale read.   |
+| refresh            | as in time.ParseDuration | Interval for periodic full re-sync with Consul. Default: no periodic refresh                                                  |
 
 ## Example
 ```go

@@ -29,6 +29,7 @@ type target struct {
 	Dc                string        `form:"dc"`
 	AllowStale        bool          `form:"allow-stale"`
 	RequireConsistent bool          `form:"require-consistent"`
+	RefreshInterval   time.Duration `form:"refresh"`
 	// TODO(mbobakov): custom parameters for the http-transport
 	// TODO(mbobakov): custom parameters for the TLS subsystem
 }
