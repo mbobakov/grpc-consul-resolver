@@ -18,8 +18,8 @@ export GOBIN := ${BIN_DIR}
 
 tools: ## Installing tools from tools.go
 	echo Installing tools
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
-	go install github.com/matryer/moq@v0.3.1
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.5
+	go install github.com/matryer/moq@v0.5.2
 
 .PHONY: clean
 clean: ## run all cleanup tasks
