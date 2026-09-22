@@ -2,51 +2,53 @@
 
 BIN_DIR = ${PWD}/bin
 
-.PHONY: clean download tools lint test generate test-integration terraform-fmt
+GOLANGCI_LINT_VERSION ?= v2.13.2
+# moq v0.7.1 is built with golang.org/x/tools that can't load packages with Go 1.27+.
+# Pinned to the commit from main until the next release.
+MOQ_VERSION ?= v0.7.2-0.20260831090446-51bed092a2bd
 
-RED=$(shell tput -T xterm setaf 1)
+.PHONY: help tools clean tidy test test-integration lint generate
+
 GREEN=$(shell tput -T xterm setaf 2)
-YELLOW=$(shell tput -T xterm setaf 3)
 RESET=$(shell tput -T xterm sgr0)
 
-DOCKER_IMAGE ?= connectivity_controller
-
-
-export GOPRIVATE=github.com/reemote/*
 export PATH := ${BIN_DIR}:$(PATH)
 export GOBIN := ${BIN_DIR}
 
-tools: ## Installing tools from tools.go
-	echo Installing tools
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
-	go install github.com/matryer/moq@v0.3.1
+tools: ## Install tools
+	@echo Installing tools
+	CGO_ENABLED=0 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	go install github.com/matryer/moq@$(MOQ_VERSION)
 
-.PHONY: clean
-clean: ## run all cleanup tasks
+clean: ## Run all cleanup tasks
 	go clean ./...
 	rm -rf $(BIN_DIR)
 	rm -rf ./builds
 
-test: generate ## Run unit tests
-	go test -count=1 -v ./...
+tidy: ## Run go mod tidy for the library and the integration tests modules
+	go mod tidy
+	cd tests && go mod tidy
+
+test: ## Run unit tests
+	go test -count=1 -race -v ./...
 	@echo ""
 	@echo "${GREEN} All tests passed ✅"
 	@echo "${RESET}"
 
-test-integration:  ## Integration test
-test-integration:
-	go test -timeout 300s -tags integration -v ./...
+test-integration: ## Run integration tests (requires Docker). Consul image can be set with CONSUL_IMAGE
+	cd tests && go test -count=1 -timeout 300s -tags integration -v ./...
 	@echo ""
 	@echo "${GREEN} All tests passed ✅"
 	@echo "${RESET}"
 
 lint: tools ## Run linter
 	${BIN_DIR}/golangci-lint --color=always run ./... -v --timeout 15m
+	cd tests && ${BIN_DIR}/golangci-lint --color=always run ./... -v --timeout 15m
 
-generate: tools
-# Because go generate doesn't support subschell we need to call it directly
-	- ./bin/moq -pkg consul -out ./mocks_grpc_test.go $$(go list -f '{{.Dir}}' google.golang.org/grpc/resolver) ClientConn
-	- go generate -x ./...
+generate: tools ## Generate mocks
+# Because go generate doesn't support subshell we need to call it directly
+	${BIN_DIR}/moq -pkg consul -out ./mocks_grpc_test.go $$(go list -f '{{.Dir}}' google.golang.org/grpc/resolver) ClientConn
+	go generate -x ./...
 
 help: ## Display help screen
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / \

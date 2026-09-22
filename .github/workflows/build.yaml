@@ -6,30 +6,65 @@ on:
     branches:
       - master
 
+permissions:
+  contents: read
+
 jobs:
-  lint-and-tests:
-    name: Run Tests
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Setting up go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v7
         with:
-          go-version: "^1.20.1"
-      - name:  lint
+          go-version: stable
+      - name: Lint
         run: make lint
+      - name: Check go.mod and go.sum are tidy
+        run: make tidy && git diff --exit-code
+      - name: Check generated mocks are up to date
+        run: make generate && git diff --exit-code
+      - name: Check for vulnerabilities
+        run: |
+          go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+          cd tests && go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 -tags integration ./...
+
+  lint-and-tests:
+    name: Run Tests (Go ${{ matrix.go }}, ${{ matrix.consul }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Minimal supported Go version (see go.mod) and the latest Consul 1.x
+          - go: "1.26.x"
+            consul: "hashicorp/consul:1.22"
+          # Latest Go and Consul versions
+          - go: stable
+            consul: "hashicorp/consul:2.0"
+    steps:
+      - uses: actions/checkout@v7
+      - name: Setting up go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ matrix.go }}
       - name: Run unit tests
         run: make test
       - name: Run integration tests
+        env:
+          CONSUL_IMAGE: ${{ matrix.consul }}
         run: make test-integration
 
   create-release:
     name: Create Release
     if: ${{ github.ref == 'refs/heads/master' }}
-    needs: [lint-and-tests]
+    needs: [lint, lint-and-tests]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Conventional Changelog Action
         uses: TriPSs/conventional-changelog-action@v3
         id: changelog

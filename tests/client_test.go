@@ -6,29 +6,29 @@ import (
 	"context"
 	"strconv"
 	"testing"
+	"time"
 
 	_ "github.com/mbobakov/grpc-consul-resolver"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	pb "google.golang.org/grpc/examples/helloworld/helloworld"
 	"google.golang.org/grpc/grpclog"
 )
 
-func TestCLient(t *testing.T) {
+func TestClient(t *testing.T) {
 	logger := logrus.New()
 	grpclog.SetLoggerV2(&grpcLog{logger})
 
 	const grpcServiceConfig = `{"loadBalancingConfig": [ { "round_robin": {} } ]}`
 	// Context for the whole test
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
 	// Spin up a Consul server
-	consulURI, teardown, err := SpinUpConsul(t)
-	defer teardown(ctx)
-	require.NoError(t, err)
+	consulURI := SpinUpConsul(t)
 
 	// counter map of destination ports
 	portCounter := make(map[int]int)
@@ -46,15 +46,14 @@ func TestCLient(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	conn, err := grpc.Dial(
+	conn, err := grpc.NewClient(
 		"consul://"+consulURI+"/helloworld?wait=14s&tag=public",
-		grpc.WithInsecure(),
-		grpc.WithBlock(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultServiceConfig(grpcServiceConfig),
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(128e+6)),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(128e+6), grpc.WaitForReady(true)),
 	)
-	defer conn.Close()
 	require.NoError(t, err)
+	defer conn.Close()
 
 	// create a client and call the server
 	client := pb.NewGreeterClient(conn)
