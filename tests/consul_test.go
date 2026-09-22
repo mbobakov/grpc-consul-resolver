@@ -3,8 +3,11 @@
 package tests
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"testing"
 
 	consulapi "github.com/hashicorp/consul/api"
@@ -13,47 +16,42 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-const (
-	consulImage = "hashicorp/consul:1.13"
-)
+// defaultConsulImage can be overridden with the CONSUL_IMAGE environment variable
+const defaultConsulImage = "hashicorp/consul:2.0"
 
-// SpinUpConsul run consul container and return options to connect to it
+// SpinUpConsul run consul container and return address to connect to it
 // It exports consul on random port and returns it. It makes this func suitable for parallel testing
-// Don't forger to call terminate function when you are ready
-func SpinUpConsul(t *testing.T) (string, func(context.Context) error, error) {
+// The container is terminated automatically when the test finishes
+func SpinUpConsul(t *testing.T) string {
 	t.Helper()
 
 	ctx := context.Background()
 
-	req := testcontainers.ContainerRequest{
-		Image:           consulImage,
-		ExposedPorts:    []string{"8500/tcp"},
-		AlwaysPullImage: true,
-		Cmd:             []string{"agent", "-ui", "-client", "0.0.0.0", "-dev"},
-		WaitingFor:      wait.ForLog(`[INFO]  agent: Synced node info`),
+	image := os.Getenv("CONSUL_IMAGE")
+	if image == "" {
+		image = defaultConsulImage
 	}
 
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-		ContainerRequest: req,
-		Started:          true,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ip, err := container.Host(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	port, err := container.MappedPort(ctx, "8500/tcp")
-	if err != nil {
-		t.Fatal(err)
-	}
+	container, err := testcontainers.Run(ctx, image,
+		testcontainers.WithExposedPorts("8500/tcp"),
+		testcontainers.WithCmd("agent", "-ui", "-client", "0.0.0.0", "-dev"),
+		testcontainers.WithWaitStrategy(
+			// Wait for the leader election. Before that the agent can't serve catalog requests
+			wait.ForHTTP("/v1/status/leader").
+				WithPort("8500/tcp").
+				WithResponseMatcher(func(body io.Reader) bool {
+					b, err := io.ReadAll(body)
+					return err == nil && !bytes.Equal(bytes.TrimSpace(b), []byte(`""`))
+				}),
+		),
+	)
+	testcontainers.CleanupContainer(t, container)
 	require.NoError(t, err)
 
-	uri := fmt.Sprintf("%s:%s", ip, port.Port())
+	uri, err := container.PortEndpoint(ctx, "8500/tcp", "")
+	require.NoError(t, err)
 
-	return uri, container.Terminate, nil
+	return uri
 }
 
 func registerService(t *testing.T, caddr, name string, port int) error {

@@ -33,12 +33,13 @@ func TestPopulateEndpoints(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var (
-				in = make(chan []string, len(tt.input))
+				in      = make(chan []string, len(tt.input))
+				updated = make(chan struct{}, 1)
 			)
 
 			fcc := &ClientConnMock{
 				UpdateStateFunc: func(state resolver.State) error {
-					require.Equal(t, tt.wantCall, state.Addresses)
+					updated <- struct{}{}
 					return nil
 				},
 			}
@@ -47,9 +48,16 @@ func TestPopulateEndpoints(t *testing.T) {
 			defer cancel()
 			go populateEndpoints(ctx, fcc, in)
 			in <- tt.input
-			time.Sleep(time.Millisecond)
 
-			require.Equal(t, 1, len(fcc.UpdateStateCalls()))
+			select {
+			case <-updated:
+			case <-time.After(time.Second):
+				t.Fatal("timeout waiting for the client connection update")
+			}
+
+			calls := fcc.UpdateStateCalls()
+			require.Equal(t, 1, len(calls))
+			require.Equal(t, tt.wantCall, calls[0].State.Addresses)
 		})
 	}
 }
@@ -78,19 +86,7 @@ func TestWatchConsulService(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			var (
-				got []string
-				out = make(chan []string)
-			)
-			go func() {
-				for {
-					select {
-					case <-ctx.Done():
-						return
-					case got = <-out:
-					}
-				}
-			}()
+			out := make(chan []string)
 			fconsul := &servicerMock{
 				ServiceFunc: func(s1, s2 string, b bool, queryOptions *api.QueryOptions) ([]*api.ServiceEntry, *api.QueryMeta, error) {
 					require.Equal(t, tt.tgt.Service, s1)
@@ -107,9 +103,13 @@ func TestWatchConsulService(t *testing.T) {
 			}
 
 			go watchConsulService(ctx, fconsul, tt.tgt, out)
-			time.Sleep(5 * time.Millisecond)
 
-			require.Equal(t, tt.want, got)
+			select {
+			case got := <-out:
+				require.Equal(t, tt.want, got)
+			case <-time.After(time.Second):
+				t.Fatal("timeout waiting for endpoints")
+			}
 		})
 	}
 }

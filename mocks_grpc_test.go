@@ -22,9 +22,6 @@ var _ resolver.ClientConn = &ClientConnMock{}
 //			NewAddressFunc: func(addresses []resolver.Address)  {
 //				panic("mock out the NewAddress method")
 //			},
-//			NewServiceConfigFunc: func(serviceConfig string)  {
-//				panic("mock out the NewServiceConfig method")
-//			},
 //			ParseServiceConfigFunc: func(serviceConfigJSON string) *serviceconfig.ParseResult {
 //				panic("mock out the ParseServiceConfig method")
 //			},
@@ -44,9 +41,6 @@ type ClientConnMock struct {
 	// NewAddressFunc mocks the NewAddress method.
 	NewAddressFunc func(addresses []resolver.Address)
 
-	// NewServiceConfigFunc mocks the NewServiceConfig method.
-	NewServiceConfigFunc func(serviceConfig string)
-
 	// ParseServiceConfigFunc mocks the ParseServiceConfig method.
 	ParseServiceConfigFunc func(serviceConfigJSON string) *serviceconfig.ParseResult
 
@@ -62,11 +56,6 @@ type ClientConnMock struct {
 		NewAddress []struct {
 			// Addresses is the addresses argument value.
 			Addresses []resolver.Address
-		}
-		// NewServiceConfig holds details about calls to the NewServiceConfig method.
-		NewServiceConfig []struct {
-			// ServiceConfig is the serviceConfig argument value.
-			ServiceConfig string
 		}
 		// ParseServiceConfig holds details about calls to the ParseServiceConfig method.
 		ParseServiceConfig []struct {
@@ -85,7 +74,6 @@ type ClientConnMock struct {
 		}
 	}
 	lockNewAddress         sync.RWMutex
-	lockNewServiceConfig   sync.RWMutex
 	lockParseServiceConfig sync.RWMutex
 	lockReportError        sync.RWMutex
 	lockUpdateState        sync.RWMutex
@@ -120,38 +108,6 @@ func (mock *ClientConnMock) NewAddressCalls() []struct {
 	mock.lockNewAddress.RLock()
 	calls = mock.calls.NewAddress
 	mock.lockNewAddress.RUnlock()
-	return calls
-}
-
-// NewServiceConfig calls NewServiceConfigFunc.
-func (mock *ClientConnMock) NewServiceConfig(serviceConfig string) {
-	if mock.NewServiceConfigFunc == nil {
-		panic("ClientConnMock.NewServiceConfigFunc: method is nil but ClientConn.NewServiceConfig was just called")
-	}
-	callInfo := struct {
-		ServiceConfig string
-	}{
-		ServiceConfig: serviceConfig,
-	}
-	mock.lockNewServiceConfig.Lock()
-	mock.calls.NewServiceConfig = append(mock.calls.NewServiceConfig, callInfo)
-	mock.lockNewServiceConfig.Unlock()
-	mock.NewServiceConfigFunc(serviceConfig)
-}
-
-// NewServiceConfigCalls gets all the calls that were made to NewServiceConfig.
-// Check the length with:
-//
-//	len(mockedClientConn.NewServiceConfigCalls())
-func (mock *ClientConnMock) NewServiceConfigCalls() []struct {
-	ServiceConfig string
-} {
-	var calls []struct {
-		ServiceConfig string
-	}
-	mock.lockNewServiceConfig.RLock()
-	calls = mock.calls.NewServiceConfig
-	mock.lockNewServiceConfig.RUnlock()
 	return calls
 }
 

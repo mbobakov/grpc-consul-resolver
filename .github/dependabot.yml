@@ -1,0 +1,33 @@
+version: 2
+updates:
+  # Library module: security updates only.
+  # Version bumps of the library dependencies raise the minimal versions for all consumers,
+  # so they are done deliberately.
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 0
+    commit-message:
+      prefix: "fix"
+
+  # Integration tests module: not visible to the library consumers, keep it fresh
+  - package-ecosystem: gomod
+    directory: "/tests"
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "test"
+    groups:
+      tests-dependencies:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci"
+    groups:
+      github-actions:
+        patterns: ["*"]

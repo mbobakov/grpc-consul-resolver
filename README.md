@@ -6,7 +6,9 @@ This library is *production ready* and will always *save backward-compatibility*
 
 ## Quick Start
 
-For using resolving endpoints from your [Hashicorp Consul](https://www.consul.io) just import this library with `import _ /github.com/mbobakov/grpc-consul-resolver` and pass valid connection string to the `grpc.Dial`.
+For using resolving endpoints from your [Hashicorp Consul](https://www.consul.io) just import this library with `import _ "github.com/mbobakov/grpc-consul-resolver"` and pass valid connection string to the `grpc.NewClient`.
+
+Requires Go 1.26 or newer.
 
 For full example see [this section](#example)
 
@@ -35,19 +37,19 @@ For full example see [this section](#example)
 package main
 
 import (
-	"time"
 	"log"
 
 	_ "github.com/mbobakov/grpc-consul-resolver" // It's important
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
-    conn, err := grpc.Dial(
+    conn, err := grpc.NewClient(
         "consul://127.0.0.1:8500/whoami?wait=14s&tag=manual",
-        grpc.WithInsecure(),
-        grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy": "round_robin"}`),
+        grpc.WithTransportCredentials(insecure.NewCredentials()),
+        grpc.WithDefaultServiceConfig(`{"loadBalancingConfig": [{"round_robin": {}}]}`),
     )
     if err != nil {
         log.Fatal(err)
@@ -57,7 +59,18 @@ func main() {
 }
 ```
 
+## Development
+
+```sh
+make lint              # golangci-lint for the library and the integration tests
+make test              # unit tests with the race detector
+make test-integration  # integration tests against Consul in Docker. Image can be set with CONSUL_IMAGE
+make generate          # regenerate mocks
+```
+
+Integration tests live in the separate `tests` module, so their dependencies (testcontainers, Docker client, etc.)
+don't leak into the library `go.mod`.
+
 ## License
 
-MIT-LICENSE. See [LICENSE](http://olivere.mit-license.org/)
-or the LICENSE file provided in the repository for details.
+MIT-LICENSE. See the [LICENCE](LICENCE) file provided in the repository for details.
